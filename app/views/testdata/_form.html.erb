@@ -101,8 +101,7 @@ $(function () {
         '/s'
       );
     };
-    console.log( this.elements )
-    console.log( this.elements["testdatum_test_input"][ "files"] )
+
     var fileInputs = Array.from( this.elements["testdatum_test_input"]["files"] ) .sort().filter( (file) => {
         return file.name.endsWith('.in');
       })
@@ -115,7 +114,6 @@ $(function () {
     /* filter the data */
 
 
-    console.log( fileInputs.length, fileOutputs.length)
     if( fileInputs.length != fileOutputs.length )  {
       alert("Error of length")
       location.reload();
@@ -128,10 +126,8 @@ $(function () {
     baseForm.delete("testdatum[test_input][]")
     baseForm.delete("testdatum[test_output][]")
 
-    console.log( num_files )
     for( let i = 0; i < num_files; ++i) {
       var formData = new FormData();;
-      console.log( fileInputs[ i ])
 
              // Iterate over all fields in the original form data
         for(let pair of baseForm.entries()) {
