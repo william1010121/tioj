@@ -87,8 +87,13 @@ $(function () {
     var _formatPercentage = function (floatValue) {
       return (floatValue * 100).toFixed(2) + ' %';
     };
-    var _renderProgress = function (data) {
+    var _formatProcess = function( perFileCnt, allFileCnt) {
+      return "File Process: " + (perFileCnt) + "/" + (allFileCnt);
+    }
+    var _renderProgress = function (data, perFileCnt, allFileCnt) {
       return (
+        _formatProcess(perFileCnt, allFileCnt) +
+        '|' +
         _formatPercentage(data.loaded / data.total) +
         ' | ' +
         _formatFileSize(data.loaded) +
@@ -185,7 +190,7 @@ $(function () {
                 evt.byterate = curByterate;
                 lastUpdate = now;
                 prevLoaded = evt.loaded;
-                $('#progress-text').text(_renderProgress(evt));
+                $('#progress-text').text(_renderProgress(evt, i, num_files));
                 $('#progress-inner-bar').width((evt.loaded / evt.total * 100) + '%');
               }
             }
