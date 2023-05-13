@@ -398,6 +398,20 @@
 </style>
 
 <script>
+/*for test and debuggin*/
+document.addEventListener('DOMContentLoaded', function() {
+  var form = document.getElementById('problem-form')
+
+  form.addEventListener('submit', function(event){
+    event.preventDefault();
+
+    console.log( event );
+    form.submit();
+  });
+});
+</script>
+
+<script>
   $(document).on('nested:fieldRemoved',function(event){
     event.field.find("input").removeAttr("min max required");
   });
