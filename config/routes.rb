@@ -9,6 +9,8 @@ Rails.application.routes.draw do
   end
   ActiveAdmin.routes(self)
 
+
+
   resources :problems do
     resources :testdata do
       collection do
@@ -27,6 +29,9 @@ Rails.application.routes.draw do
       get 'ranklist'
       get 'ranklist_old' if Rails.configuration.x.settings.dig(:old_submission_views)
     end
+
+    # add import problem webpage
+    get 'import', on: :collection, as: 'import'
   end
 
   resources :judge_servers
@@ -82,9 +87,12 @@ Rails.application.routes.draw do
   mathjax 'mathjax'
 
   get 'about' => 'about#index', as: :about
+  
+
 
   get 'problems/:id/*file' => redirect{ |path, req| "/#{path[:file]}"}, :format => false, :id => /[0-9]+/
   get 'problems/*file' => redirect{ |path, req| "/#{path[:file]}"}, :format => false
+
   # The priority is based upon order of creation: first created -> highest priority.
   # See how all your routes lay out with "rake routes".
 

@@ -1,9 +1,9 @@
 class ProblemsController < ApplicationController
-  before_action :authenticate_admin!, only: [:new, :create, :edit, :update, :destroy]
+  before_action :authenticate_admin!, only: [:new, :create, :edit, :update, :destroy, :import]
   before_action :set_problem, only: [:show, :edit, :update, :destroy, :ranklist, :ranklist_old]
   before_action :set_contest, only: [:show]
   before_action :set_testdata, only: [:show]
-  before_action :set_compiler, only: [:new, :edit]
+  before_action :set_compiler, only: [:new, :edit, :import]
   before_action :reduce_list, only: [:create, :update]
   before_action :check_visibility!, only: [:show, :ranklist, :ranklist_old]
   layout :set_contest_layout, only: [:show]
@@ -79,6 +79,12 @@ class ProblemsController < ApplicationController
   end
 
   def new
+    @problem = Problem.new
+    1.times { @problem.sample_testdata.build }
+    @ban_compiler_ids = Set[]
+  end
+
+  def import
     @problem = Problem.new
     1.times { @problem.sample_testdata.build }
     @ban_compiler_ids = Set[]
