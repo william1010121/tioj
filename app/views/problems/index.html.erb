@@ -8,7 +8,7 @@
 
 <% if current_user&.admin %>
   <%= link_to 'New Problem', new_problem_path, :class => 'btn btn-success btn-sm' %>
-  <%= link_to 'Import Problem', new_problem_path, :class => 'btn btn-success btn-sm' %><br>
+  <%= link_to 'Import Problem', import_problems_path, :class => 'btn btn-success btn-sm' %><br>
 <% end %>
 
 

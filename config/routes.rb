@@ -10,6 +10,9 @@ Rails.application.routes.draw do
   ActiveAdmin.routes(self)
 
   resources :problems do
+    get 'import', on: :collection, as: "import"
+    post 'import_problem', on: :collection, as: 'import_problem'
+
     resources :testdata do
       collection do
         get 'batch_edit'
@@ -27,6 +30,7 @@ Rails.application.routes.draw do
       get 'ranklist'
       get 'ranklist_old' if Rails.configuration.x.settings.dig(:old_submission_views)
     end
+
   end
 
   resources :judge_servers
