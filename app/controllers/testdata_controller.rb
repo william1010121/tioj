@@ -4,7 +4,7 @@ class TestdataController < ApplicationController
   before_action :set_testdatum, only: [:show, :edit, :update, :destroy]
   before_action :set_testdata, only: [:batch_edit, :batch_update]
   helper_method :strip_uuid
-  
+
   COMPRESS_THRESHOLD = 128 * 1024
 
   def index
