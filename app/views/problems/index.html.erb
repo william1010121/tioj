@@ -7,8 +7,10 @@
 </h4>
 
 <% if current_user&.admin %>
-  <%= link_to 'New Problem', new_problem_path, :class => 'btn btn-success btn-sm' %><br>
+  <%= link_to 'New Problem', new_problem_path, :class => 'btn btn-success btn-sm' %>
+  <%= link_to 'Import Problem', new_problem_path, :class => 'btn btn-success btn-sm' %><br>
 <% end %>
+
 
 <form class="form-inline search-form" accept-charset="UTF-8" method="get">
   <label for="search_id">Search Problems</label>
