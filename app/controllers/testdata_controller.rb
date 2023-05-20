@@ -4,7 +4,7 @@ class TestdataController < ApplicationController
   before_action :set_testdatum, only: [:show, :edit, :update, :destroy]
   before_action :set_testdata, only: [:batch_edit, :batch_update]
   helper_method :strip_uuid
-  
+
   COMPRESS_THRESHOLD = 128 * 1024
 
   def index
@@ -52,7 +52,7 @@ class TestdataController < ApplicationController
       if testdata_errors.empty?
         format.html { redirect_to problem_testdata_path(@problem), notice: 'Testdatum was successfully created.' }
         #format.json { render action: 'show', status: :created, location: prob_testdata_path(@problem, @testdatum) }
-      else 
+      else
           format.html { render action: 'new' }
           format.json { render json: testdata_errors, status: :unprocessable_entity }
       end
@@ -204,7 +204,7 @@ class TestdataController < ApplicationController
     new_params_list = test_input.zip(test_output).map do |item1, item2|
       new_params.dup.tap do |params|
         params[:test_input] = item1
-        params[:test_output] = item2 
+        params[:test_output] = item2
 
         if params[:test_input]
           params[:input_compressed] = false
@@ -219,7 +219,7 @@ class TestdataController < ApplicationController
         end
       end
     end
-    
+
     new_params_list
   end
 
