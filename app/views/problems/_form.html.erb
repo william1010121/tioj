@@ -4,7 +4,7 @@
   <% set_page_title "New problem" %>
 <% end %>
 
-<%= nested_form_for @problem, :html => {:class => 'form', :id => 'problem-form'} do |f| %>
+<%= nested_form_for @problem, :html => {:class => 'form', :id => 'problem-form', :style => ('display:none;' if hidden||=false)} do |f| %>
   <%= render partial: "shared/errors", locals: {errors: @problem.errors, item: 'problem'} %>
 
   <div class="row">
@@ -396,6 +396,20 @@
   align-items: flex-end;
 }
 </style>
+
+<script>
+/*for test and debuggin*/
+document.addEventListener('DOMContentLoaded', function() {
+  var form = document.getElementById('problem-form')
+
+  form.addEventListener('submit', function(event){
+    event.preventDefault();
+
+    console.log( event );
+    form.submit();
+  });
+});
+</script>
 
 <script>
   $(document).on('nested:fieldRemoved',function(event){

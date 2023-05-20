@@ -1,0 +1,112 @@
+<% if @problem.persisted? %>
+  <% set_page_title "Edit " + @problem.id.to_s + " - " + @problem.name %>
+<% else %>
+  <% set_page_title "New problem" %>
+<% end %>
+
+<%= form_with :html => {:class => 'form', :id => 'import-form'}, remote: true, authenticity_token: true  do |f| %>
+    <%= render partial: "shared/errors", locals: {errors: @problem.errors, item: 'problem'}%>
+
+    <div class="form-group">
+        <%= f.label :test_input, "Input testdata" %>
+        <%= f.file_field :test_input, :class => 'form-control flat'%>
+    </div>
+
+    <div class="actions">
+        <span class="flex-container-bottom-align">
+        <%= f.submit :class => 'btn btn-success btn-lg', :id => 'submit-btn' %>
+        <% if @isNewProblem == true %>
+            &nbsp;
+            <span class="fancy-checkbox">
+            <input type="checkbox" id="disable-fool-proof" autocomplete="off" />
+            <div class="btn-group">
+                <label for="disable-fool-proof" class="btn btn-xs btn-default">
+                <span class="glyphicon glyphicon-ok"></span>
+                <span></span>
+                </label>
+                <label for="disable-fool-proof" class="btn btn-xs btn-default">
+                Disable fool-proof of repeat sub
+                </label>
+            </div>
+            </span>
+        <% end %>
+
+        </span>
+    </div>
+<% end%>
+
+<div class="alert alert-success" id='problem-update' style='display: none'>
+    Problem update Success 
+</div>
+
+<% @isNewProblem = true %>
+<%= render 'form', hidden: true%>
+
+
+
+<script>
+$(function() {
+    
+    const zjson_to_problem_form = {
+        "problem[name]": "title",
+        "problem[tag_list]": "",
+        "problem[solution_tag_list]": "keywords",
+        "problem[visible_state]": "public",
+        "problem[description]": "content",
+        "problem[input]": "theinput",
+        "problem[output]": "theoutput",
+        "problem[sample_testdata_attributes][0][input]": "sampleinput",
+        "problem[sample_testdata_attributes][0][_destroy]": false,
+        "problem[sample_testdata_attributes][0][output]": "sampleoutput",
+        "problem[hint]": "",
+        "problem[source]": "reference",
+        "problem[discussion_visibility]": "enabled",
+        "problem[specjudge_type]": "none",
+        "problem[interlib_type]": "none",
+        "problem[num_stages]": 1,
+        "problem[score_precision]": 2,
+        "problem[code_length_limit]": 5000000,
+        "problem[ranklist_display_score]": 0,
+        "problem[skip_group]": 0,
+        "problem[strict_mode]": 0,
+    };
+
+
+    var manage_data = function(event) {
+        let file = ( event.currentTarget[1]['files'][0] )
+
+        const reader = new FileReader();
+
+        reader.readAsText(file, 'utf-8');
+
+        reader.onload = (e) => {
+            const contents = e.target.result
+            const jsonData = JSON.parse(contents)
+
+            console.log( jsonData )
+
+            $('#problem-form') .css( 'display', 'block')
+
+            Object.entries(zjson_to_problem_form).forEach(function([key, value]) {
+                console.log( `name="${key}"`, value)
+                if( value == 'none')
+                    $(`[name="${key}"]`).val('none')
+                else if( !jsonData.hasOwnProperty(value) )
+                    $(`[name="${key}"]`).val(value)
+                else 
+                    $(`[name="${key}"]`).val(jsonData[value])
+            });
+
+        };
+    }
+
+    $('#import-form') .submit( function(event ) {
+        event.preventDefault();
+
+        $('#import-form').css("display", "none");
+        $('#problem-update').css( "display", "block" )
+
+        manage_data(event)
+    })
+})
+</script>
