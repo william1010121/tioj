@@ -116,7 +116,33 @@ $(function () {
       return;
     }
 
-    var formData = new FormData(this);
+    var tmpData = new FormData(this);
+    var formData = new FormData;
+
+
+    for( let [key, value] of tmpData.entries() ){
+      if( key == 'testdatum[test_input_list][]' || key == 'testdatum[test_output_list][]' ){
+        continue;
+      }
+      formData.append(key, value);
+    }
+    FileInput.forEach( (file) => {
+      formData.append('testdatum[test_input_list][]', file);
+    });
+    FileOutput.forEach( (file) => {
+      formData.append('testdatum[test_output_list][]', file);
+    });
+
+
+    for( let key of FileInput) {
+      console.log( key )
+    }
+
+
+    for( let [key, value] of formData.entries() ) {
+      console.log( key, value)
+    }
+
     var lastUpdate = (new Date().getTime()) - 500;
     var byterate = 0.0;
     var prevLoaded = 0;
