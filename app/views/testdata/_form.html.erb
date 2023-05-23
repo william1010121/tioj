@@ -103,10 +103,10 @@ $(function () {
     };
 
     //console.log( this.elements['testdatum_test_input_list']['files'])
-    var FileInput  = Array.from( this.elements['testdatum_test_input_list']['files'] ).filter( (file) => {
+    var FileInput  = Array.from( this.elements['testdatum_test_input_list']['files'] ) .sort() .filter( (file) => {
       return file.name.endsWith('.in');
     });
-    var FileOutput = Array.from( this.elements['testdatum_test_output_list']['files'] ).filter( (file) => {
+    var FileOutput = Array.from( this.elements['testdatum_test_output_list']['files'] ) .sort() .filter( (file) => {
       return file.name.endsWith('.out');
     });
     if( FileInput.length != FileOutput.length ){
@@ -115,9 +115,24 @@ $(function () {
       location.reload();
       return;
     }
+    if( FileInput.length == 0 ){
+      alert('No input files.');
+      //refresh the page
+      location.reload();
+      return;
+    }
+
+    for( let idx = 0; idx < FileInput.length; idx++ ){
+      if( FileInput[idx].name.replace('.in', '') != FileOutput[idx].name.replace('.out', '') ){
+        alert('Input file name and output file name are not equal.');
+        //refresh the page
+        location.reload();
+        return;
+      }
+    }
 
     var tmpData = new FormData(this);
-    var formData = new FormData;
+    var formData = new FormData();
 
 
     for( let [key, value] of tmpData.entries() ){
