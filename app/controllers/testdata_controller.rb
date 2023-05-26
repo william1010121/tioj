@@ -227,11 +227,13 @@ class TestdataController < ApplicationController
                   .reject{ |item| item == '.' or item == '..' }
                   .select{ |item| item.end_with?(".in") }
                   .map{ |file_name| File.join(test_input_folder, file_name) }
+                  .sort{ |a, b| a <=> b}
                   .map{ |file_name| File.open(file_name, 'rb')}
     test_output = Dir.foreach(test_output_folder)
                   .reject{ |item| item == '.' or item == '..' }
                   .select{ |item| item.end_with?(".out") }
                   .map{ |file_name| File.join(test_output_folder, file_name) }
+                  .sort{ |a, b| a <=> b}
                   .map{ |file_name| File.open(file_name, 'rb') }
 
     # making the zip file to be like the fileList
