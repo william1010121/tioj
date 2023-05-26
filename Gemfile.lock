@@ -431,6 +431,7 @@ DEPENDENCIES
   rdoc (~> 6)
   redcarpet
   redis (~> 4)
+  rubyzip
   sass-rails
   sdoc
   selenium-webdriver
