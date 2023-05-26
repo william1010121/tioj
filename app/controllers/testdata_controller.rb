@@ -152,7 +152,7 @@ class TestdataController < ApplicationController
 
   def compress_file(f)
     Tempfile.create(binmode: true) do |tmpfile|
-      File.open(f, 'rb') do |origfile|
+      File.open(f.path, 'rb') do |origfile|
         stream = Zstd::StreamingCompress.new(7)
         while (buffer = origfile.read(1024 * 1024)) do
           tmpfile.write(stream.compress(buffer))
@@ -227,10 +227,12 @@ class TestdataController < ApplicationController
                   .reject{ |item| item == '.' or item == '..' }
                   .select{ |item| item.end_with?(".in") }
                   .map{ |file_name| File.join(test_input_folder, file_name) }
+                  .map{ |file_name| File.open(file_name, 'rb')}
     test_output = Dir.foreach(test_output_folder)
                   .reject{ |item| item == '.' or item == '..' }
                   .select{ |item| item.end_with?(".out") }
                   .map{ |file_name| File.join(test_output_folder, file_name) }
+                  .map{ |file_name| File.open(file_name, 'rb') }
 
     # making the zip file to be like the fileList
     puts "test_input: #{test_input}"
@@ -252,13 +254,13 @@ class TestdataController < ApplicationController
 
         if params[:test_input]
           params[:input_compressed] = false
-          if File.size(params[:test_input]) >= COMPRESS_THRESHOLD
+          if (params[:test_input]).size >= COMPRESS_THRESHOLD
             params[:input_compressed] = compress_file(params[:test_input])
           end
         end
         if params[:test_output]
           params[:output_compressed] = false
-          if File.size(params[:test_output]) >= COMPRESS_THRESHOLD
+          if (params[:test_output]).size >= COMPRESS_THRESHOLD
             params[:output_compressed] = compress_file(params[:test_output])
           end
         end
