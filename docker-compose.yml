@@ -1,10 +1,11 @@
+
 version: "3.7"
 
 x-logging:
   &default-logging
   driver: "json-file"
-  options:
-    max-size: "100m"
+  options: 
+    max-size: "100m" 
     max-file: "2"
 
 services:
@@ -14,6 +15,7 @@ services:
       args:
         MYSQL_ROOT_PASSWORD: $MYSQL_ROOT_PASSWORD
         TIOJ_KEY: $FETCH_KEY
+    platform: "linux/amd64"
     environment:
       - RAILS_ENV=production
       - SMTP_USERNAME
@@ -23,9 +25,9 @@ services:
       - MAIL_HOSTNAME
       - MAIL_SENDER
     volumes:
-      - /srv/tioj/web-td:/tioj/td
-      - /srv/tioj/web-log:/tioj/log
-      - /srv/tioj/public:/tioj/public
+      - /Users/Shared/tioj/web-td:/tioj/td
+      - /Users/Shared/tioj/web-log:/tioj/log
+      - /Users/Shared/tioj/public:/tioj/public
     depends_on:
       - db
     networks:
@@ -36,7 +38,7 @@ services:
   db:
     image: mysql:8.0
     volumes:
-      - /srv/tioj/db:/var/lib/mysql
+      - /Users/Shared/tioj/db:/var/lib/mysql
     environment:
       - MYSQL_ROOT_PASSWORD=$MYSQL_ROOT_PASSWORD
       - MYSQL_DATABASE=tioj_production
@@ -44,13 +46,14 @@ services:
       - app
     logging: *default-logging
   judge:
-    build: https://github.com/TIOJ-INFOR-Online-Judge/tioj-judge.git#ddb2f430eb7b6a4561ed23c1ef2ad94fcafc5b22
+    build: https://github.com/william1010121/tioj-judge.git#8fe6a67ae3f5c41f02d71fa1ad3bed2773323ae4
+    platform: "linux/amd64"
     environment:
       TIOJ_URL: "http://localhost:4000"
       TIOJ_KEY: $FETCH_KEY
     volumes:
-      - /srv/tioj/judge-td-pool:/var/lib/tioj-judge/td-pool
-      - /srv/tioj/judge-testdata:/var/lib/tioj-judge/testdata
+      - /Users/Shared/tioj/judge-td-pool:/var/lib/tioj-judge/td-pool
+      - /Users/Shared/tioj/judge-testdata:/var/lib/tioj-judge/testdata
     tmpfs:
       - /tmp:exec
     privileged: true
