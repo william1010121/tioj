@@ -20,6 +20,7 @@
       <th>Motto</th>
       <th>Accepted</th>
       <th>AC Ratio</th>
+      <th>Role</th>
     </tr>
   </thead>
 
@@ -37,6 +38,7 @@
         <% end %>
         <td><%= user.ac %></td>
         <td><%= ac_ratio_by_user_with_infor(user) %></td>
+        <td> <%=user.role%> </td>
       </tr>
     <%end%>
   </tbody>

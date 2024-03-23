@@ -88,5 +88,9 @@
       </table>
     </div>
   </div>
+  <% if user_signed_in? %>
+  <p>Your role: <%= current_user.role %></p>
+  <% end %>
+
 </div>
 

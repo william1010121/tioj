@@ -6,7 +6,7 @@
   <% end %>
 </h4>
 
-<% if current_user&.admin? %>
+<% if can? :create, Problem %>
   <%= link_to 'New Problem', new_problem_path, class: 'btn btn-success btn-sm' %>
   <br>
 <% end %>

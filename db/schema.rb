@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.0].define(version: 2023_10_01_071847) do
+ActiveRecord::Schema[7.0].define(version: 2024_03_23_125522) do
   create_table "active_admin_comments", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
     t.string "namespace"
     t.text "body", size: :medium
@@ -411,6 +411,7 @@ ActiveRecord::Schema[7.0].define(version: 2023_10_01_071847) do
     t.bigint "last_compiler_id"
     t.string "type", default: "User", null: false
     t.bigint "contest_id"
+    t.string "role"
     t.index ["contest_id"], name: "index_users_on_contest_id"
     t.index ["last_compiler_id"], name: "index_users_on_last_compiler_id"
     t.index ["type", "contest_id", "email"], name: "index_users_on_type_and_contest_id_and_email", unique: true

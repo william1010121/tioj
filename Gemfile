@@ -95,6 +95,9 @@ gem 'redis', '~> 4'
 gem 'sentry-ruby'
 gem 'sentry-rails'
 
+# for permison
+gem 'cancancan'
+
 group :development do
   # Bullet for debugging
   gem 'bullet', group: 'development'

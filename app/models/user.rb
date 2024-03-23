@@ -27,6 +27,7 @@
 #  last_compiler_id       :bigint
 #  type                   :string(255)      default("User"), not null
 #  contest_id             :bigint
+#  role                   :string(255)
 #
 # Indexes
 #
@@ -47,6 +48,8 @@ require 'file_size_validator'
 
 class UserBase < ApplicationRecord
   self.table_name = "users"
+  ROLES = %w[admin golduser normaluser].freeze
+  before_create :set_default_role
 
   has_many :submissions, dependent: :destroy, foreign_key: :user_id
   has_many :posts, dependent: :destroy, foreign_key: :user_id
@@ -84,6 +87,9 @@ class UserBase < ApplicationRecord
     end
   end
 
+  def set_default_role
+    self.role ||= 'normaluser'
+  end
   def generate_random_avatar
     Tempfile.create(['', '.png']) do |tmpfile|
       Visicon.new(SecureRandom.random_bytes(16), '', 128).draw_image.write(tmpfile.path)

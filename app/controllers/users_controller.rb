@@ -2,6 +2,7 @@ class UsersController < ApplicationController
   before_action :authenticate_current!, only: [:changed_problems, :changed_submissions]
   before_action :set_user, only: [:show, :changed_problems, :changed_submissions]
 
+
   def index
     @users = Kaminari.paginate_array(get_sorted_user).page(params[:page]).per(25)
   end
@@ -45,6 +46,26 @@ class UsersController < ApplicationController
   def current
     authenticate_user!
     redirect_to user_path(current_user) + '/' + params[:path]
+  end
+
+  def change_role
+    puts params
+    user_to_change = User.friendly.find(params[:id]) 
+    new_role = change_role_params[:role]
+  
+    if not User::ROLES.include?(new_role)
+      flash[:alert] = 'Invalid role.'
+    elsif user_to_change.update(role: new_role)
+      flash[:notice] = 'Role successfully changed.'
+    else
+      flash[:alert] = 'Role change failed.'
+    end
+  
+    redirect_to user_path(user_to_change)
+  end
+  
+  def change_role_params
+    params.require(:user).permit(:role)
   end
 
   private

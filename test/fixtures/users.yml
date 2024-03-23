@@ -27,6 +27,7 @@
 #  last_compiler_id       :bigint
 #  type                   :string(255)      default("User"), not null
 #  contest_id             :bigint
+#  role                   :string(255)
 #
 # Indexes
 #

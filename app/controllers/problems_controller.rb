@@ -1,12 +1,13 @@
 class ProblemsController < ApplicationController
   before_action :authenticate_user_and_running_if_single_contest!, only: [:show]
-  before_action :authenticate_admin!, only: [:new, :create, :edit, :update, :destroy, :import]
+  #before_action :authenticate_admin!, only: [:new, :create, :edit, :update, :destroy, :import]
   before_action :set_problem, only: [:show, :edit, :update, :destroy, :ranklist, :ranklist_old, :rejudge]
   before_action :set_testdata, only: [:show]
   before_action :set_compiler, only: [:new, :edit, :import]
   before_action :reduce_list, only: [:create, :update]
   before_action :check_visibility!, only: [:show, :ranklist, :ranklist_old]
   layout :set_contest_layout, only: [:show]
+  load_and_authorize_resource
 
 
   def ranklist

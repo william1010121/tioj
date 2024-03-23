@@ -1,12 +1,18 @@
 Rails.application.routes.draw do
   resources :announcements
 
+
   devise_for :users, controllers: {registrations: "registrations", passwords: "users/passwords"}
   devise_for :admin_users, ActiveAdmin::Devise.config
 
   scope 'admin' do
     resources :users, controller: 'admin/users', as: 'admin_users', constraints: { id: /[^\/]+/ }, defaults: { format: :html }, format: false
   end
+
+  resources  :users do
+    patch :change_role, on: :member
+  end
+
   ActiveAdmin.routes(self)
 
   resources :problems do
