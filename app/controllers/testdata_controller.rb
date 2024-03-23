@@ -49,6 +49,7 @@ class TestdataController < ApplicationController
   def batch_create_edit
     @testdatum = @problem.testdata.build
   end
+
   def batch_create
 
     begin
