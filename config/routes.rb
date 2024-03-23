@@ -10,6 +10,10 @@ Rails.application.routes.draw do
   ActiveAdmin.routes(self)
 
   resources :problems do
+    collection do
+      get 'import'
+      post 'import' => 'problems#import_create'
+    end
     resources :testdata do
       collection do
         get 'batch_new'

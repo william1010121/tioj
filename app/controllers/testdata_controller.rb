@@ -229,7 +229,21 @@ class TestdataController < ApplicationController
     params
   end
 
-  # Never trust parameters from the scary internet, only allow the white list through. 
+  def remove_folder(folder_path)
+    FileUtils.remove_entry folder_path
+  end
+
+
+
+  def is_zip?(file_path)
+    begin
+      Zip::File.open(file_path)
+    rescue StandardError => e
+      return false
+    end
+    return true
+  end
+  # Never trust parameters from the scary internet, only allow the white list through.
   # and check if the file is a zip file
   def unzip_testdata(tmp_folder)
     checked_params = params.require(:testdatum).permit(

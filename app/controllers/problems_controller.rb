@@ -1,12 +1,13 @@
 class ProblemsController < ApplicationController
   before_action :authenticate_user_and_running_if_single_contest!, only: [:show]
-  before_action :authenticate_admin!, only: [:new, :create, :edit, :update, :destroy]
+  before_action :authenticate_admin!, only: [:new, :create, :edit, :update, :destroy, :import]
   before_action :set_problem, only: [:show, :edit, :update, :destroy, :ranklist, :ranklist_old, :rejudge]
   before_action :set_testdata, only: [:show]
-  before_action :set_compiler, only: [:new, :edit]
+  before_action :set_compiler, only: [:new, :edit, :import]
   before_action :reduce_list, only: [:create, :update]
   before_action :check_visibility!, only: [:show, :ranklist, :ranklist_old]
   layout :set_contest_layout, only: [:show]
+
 
   def ranklist
     # avoid additional COUNT(*) query by to_a
@@ -100,6 +101,7 @@ class ProblemsController < ApplicationController
     @ban_compiler_ids = @problem.compilers.map(&:id).to_set
   end
 
+
   def create
     params[:problem][:compiler_ids] ||= []
     @problem = Problem.new(check_params())
@@ -144,7 +146,57 @@ class ProblemsController < ApplicationController
     end
   end
 
+  def import
+    @problem_errors = ActiveModel::Errors.new(self)
+  end
+
+  def unzip_file(folder_path, file, file_type, language)
+    begin
+      if file_type == 'zjson'
+        ProblemFormatTransformer.new(@problem,file,language).transform_zerojudge_to_params(folder_path)
+      elsif file_type == 'poloygon'
+        ProblemFormatTransformer.new(@problem,file,language).transform_polygon_to_params(folder_path)
+      else
+        @problem_errors.add(:base, 'here')
+        @problem_errors.add(:base, 'Invalid request')
+      end
+    rescue ArgumentError => e
+      @problem_errors.add(:base, e.message)
+    rescue StandardError => e
+      @problem_errors.add(:base, "Invalid request: #{e.full_message}") # for debug
+    end
+  end
+
+
+  def import_create
+    @problem_errors = ActiveModel::Errors.new(self)
+    @problem = Problem.new
+    params = check_import_parm
+
+    Dir.mktmpdir do |tmp_folder|
+      unzip_file(tmp_folder, params[:file], params[:upload_type],params[:language])
+
+      respond_to do |format|
+        if @problem_errors.any?
+          format.html { render action: 'import' }
+          format.json { render json: @problem_errors, status: :unprocessable_entity }
+        elsif @problem.save
+          format.html { redirect_to @problem, notice: 'Problem was successfully created.' }
+          format.json { render action: 'show', status: :created, location: @problem }
+        else
+          format.html { render action: 'import' }
+          format.json { render json: @problem.errors, status: :unprocessable_entity }
+        end
+      end
+    end
+  end
   private
+
+  def remove_folder(folder_path)
+    FileUtils.remove_entry folder_path
+  end
+
+
 
   def set_problem
     @problem = Problem.find(params[:id])
@@ -208,8 +260,8 @@ class ProblemsController < ApplicationController
     end
   end
 
-  def check_params
-    params = problem_params.clone
+  def check_params(myparams = params)
+    params = problem_params(myparams).clone
     if params[:specjudge_type] != 'none' and not params[:specjudge_compiler_id] and not @problem&.specjudge_compiler_id
       params[:specjudge_compiler_id] = Compiler.order(order: :asc).first.id
     end
@@ -219,9 +271,16 @@ class ProblemsController < ApplicationController
     params
   end
 
-  # Never trust parameters from the scary internet, only allow the white list through.
-  def problem_params
+  def check_import_parm
     params.require(:problem).permit(
+      :upload_type,
+      :file,
+      :language
+    );
+  end
+  # Never trust parameters from the scary internet, only allow the white list through.
+  def problem_params( my_params = params )
+    my_params.require(:problem).permit(
       :id,
       :name,
       :description,
@@ -272,6 +331,15 @@ class ProblemsController < ApplicationController
         :constraints,
         :score,
         :_destroy
+      ],
+      testdata_attributes:[
+        :problem_id,
+        :test_input,
+        :test_output,
+        :time_limit,
+        :rss_limit,
+        :vss_limit,
+        :output_limit,
       ]
     )
   end
