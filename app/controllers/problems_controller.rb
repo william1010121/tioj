@@ -8,6 +8,8 @@ class ProblemsController < ApplicationController
   before_action :check_visibility!, only: [:show, :ranklist, :ranklist_old]
   layout :set_contest_layout, only: [:show]
 
+  has_many :testdata
+
   def ranklist
     # avoid additional COUNT(*) query by to_a
     @submissions = (@problem.submissions.where(contest_id: nil, result: 'AC')
