@@ -49,7 +49,6 @@ class UsersController < ApplicationController
   end
 
   def change_role
-    puts params
     user_to_change = User.friendly.find(params[:id]) 
     new_role = change_role_params[:role]
   
