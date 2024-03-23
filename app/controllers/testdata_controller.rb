@@ -50,6 +50,7 @@ class TestdataController < ApplicationController
     # testdatum_params_list.each do |p|
     #   puts p
     # end
+    testdatum_params_list, test_input_folder, test_output_folder = unzip_testdatum_params_list
 
     testdatum_params_list.each do |testdatum_params|
       @testdatum = @problem.testdata.build(testdatum_params.to_h)
@@ -57,6 +58,11 @@ class TestdataController < ApplicationController
         testdata_errors << @testdatum.errors
       end
     end
+
+    #remove the temp folder
+    remove_folder(test_input_folder)
+    remove_folder(test_output_folder)
+
 
     respond_to do |format|
       if testdata_errors.empty?
@@ -214,7 +220,7 @@ class TestdataController < ApplicationController
   end
 
   # Never trust parameters from the scary internet, only allow the white list through.
-  def testdatum_params_list
+  def unzip_testdatum_params_list
     new_params = params.require(:testdatum).permit(
       :problem_id,
       :time_limit,
@@ -281,8 +287,7 @@ class TestdataController < ApplicationController
         end
       end
     end
-    puts new_params_list
-    new_params_list
+    return new_params_list, test_input_folder, test_output_folder
   end
 
   def testdatum_params
