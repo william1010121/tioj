@@ -8,7 +8,6 @@ class ProblemsController < ApplicationController
   before_action :check_visibility!, only: [:show, :ranklist, :ranklist_old]
   layout :set_contest_layout, only: [:show]
 
-  has_many :testdata
 
   def ranklist
     # avoid additional COUNT(*) query by to_a
@@ -155,13 +154,15 @@ class ProblemsController < ApplicationController
     params = check_import_parm
     json = JSON.parse(params[:json_file].read)
     my_params = transform_json_to_params(json)
+    puts "My params: #{my_params}"
     my_params[:problem][:compiler_ids] ||= []
 
     #create problem
     @problem = Problem.new(check_params( my_params ))
     @ban_compiler_ids = my_params[:problem][:compiler_ids].map(&:to_i).to_set
 
-    #create testdata
+    #check if problem save
+    puts "My problem: #{@problem.save}"
 
     respond_to do |format|
       if @problem.save
@@ -258,7 +259,8 @@ class ProblemsController < ApplicationController
         "ranklist_display_score": 0, # need to be complete
         "skip_group":0,
         "strict_mode": 0,
-        "verdict_ignore_td_list": ""
+        "verdict_ignore_td_list": "",
+        "testdata_attributes": Array([])
       }
 
       puts "My problem: #{problem}"
@@ -267,14 +269,39 @@ class ProblemsController < ApplicationController
       problem["sample_testdata_attributes"] << {
         "input": json["sampleinput"],
         "output": json["sampleoutput"],
-        "destroy": "false"
+        "_destroy": "false"
       }
       for i in 0..json["scores"].length-1
         problem["subtasks_attributes"] << {
           "td_list": i,
           "constraints": "",
           "score": json["scores"][i],
-          "destroy": "false"
+        }
+      end
+      # confirm the testinfile and testoutfile own the same length
+      if json["testinfiles"].length != json["testoutfiles"].length
+        raise "The length of testinfiles and testoutfiles are not the same"
+      end
+
+
+      folder_path = Dir.mktmpdir
+      problem["testdata_attributes"] ||= Array([])
+      for i in 0..json["testinfiles"].length-1
+        inputfile_path = "#{folder_path}/testinfiles#{i}.in"
+        outputfile_path = "#{folder_path}/testoutfiles#{i}.out"
+        inputfile = File.open(inputfile_path, "w");
+        outputfile = File.open(outputfile_path, "w");
+
+        inputfile.write(json["testinfiles"][i])
+        outputfile.write(json["testoutfiles"][i])
+
+        problem["testdata_attributes"] << {
+          "test_input":  inputfile,
+          "test_output": outputfile,
+          "time_limit": json["timelimits"][i],
+          "rss_limit": json["memorylimit"]*1024,
+          "vss_limit": 0,
+          "output_limit": 0
         }
       end
 
@@ -408,6 +435,15 @@ class ProblemsController < ApplicationController
         :constraints,
         :score,
         :_destroy
+      ],
+      testdata_attributes:[
+        :problem_id,
+        :test_input,
+        :test_output,
+        :time_limit,
+        :rss_limit,
+        :vss_limit,
+        :output_limit,
       ]
     )
   end

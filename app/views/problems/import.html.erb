@@ -2,6 +2,7 @@
 
 <% @isNewProblem = true %>
 <%= form_with model: @problem, url: :import_create_problems,  method: :post, multipart: true do |f|%>
+    <%= render partial: "shared/errors", locals: {errors: @problem.errors, item: 'problem'} %>
     <%= puts :import_create_problems %>
     <%=  f.file_field :json_file %>
     <%=  f.submit 'Import', class: 'btn btn-primary' %>
