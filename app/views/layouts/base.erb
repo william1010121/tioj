@@ -7,7 +7,9 @@
 <%= javascript_include_tag "application" %>
 <%= csrf_meta_tags %>
 <script>MathJax={tex:{inlineMath:[['$','$'],['\\(','\\)']]}};</script>
-<%= mathjax_tag component: 'tex-svg-full.js' %>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.2/es5/tex-svg-full.min.js" integrity="sha512-rt6EnxNkuTTgQX2397gLDTao/kZrmdNM4ZO7n89nX6KqOauwSQTGOq3shcd/oGyUc0czxMKBvj+gML8dxX4hAg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<!-- <%= mathjax_tag component: 'tex-svg-full.js' %> -->
 <%= yield :icon %>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>

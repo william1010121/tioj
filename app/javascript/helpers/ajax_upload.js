@@ -53,7 +53,7 @@ export function ajaxUploadFunc() {
   let prevLoaded = 0;
   let oldUrl = window.location.href;
   let xhr = null;
-  return function(url, formData, onprogress, onabort) {
+  return function(url, formData, onprogress, onabort, always=(nxhr,status)=>{}) {
     $.ajax({
       type: 'POST',
       url: url,
@@ -87,6 +87,9 @@ export function ajaxUploadFunc() {
       },
       error: function (nxhr, status, error) {
         document.querySelector('html').innerHTML = nxhr.responseText;
+      },
+      complete: function (nxhr, status) {
+        always(nxhr, status);
       },
       abort: onabort,
     });

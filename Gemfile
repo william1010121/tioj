@@ -89,6 +89,9 @@ gem 'redis', '~> 4'
 gem 'sentry-ruby'
 gem 'sentry-rails'
 
+# latex to markdown
+gem 'pandoc-ruby'
+
 group :development do
   # Bullet for debugging
   gem 'bullet', group: 'development'
@@ -96,6 +99,13 @@ group :development do
 
   # Use console on exceptions pages [https://github.com/rails/web-console]
   gem 'web-console'
+
+
+  # for debug
+  gem 'pry'
+  gem 'pry-rails'
+  gem 'pry-nav'
+  gem 'pry-remote'
 end
 
 group :test do
