@@ -1,12 +1,13 @@
 class ProblemsController < ApplicationController
   before_action :authenticate_user_and_running_if_single_contest!, only: [:show]
-  before_action :authenticate_admin!, only: [:new, :create, :edit, :update, :destroy]
+  before_action :authenticate_admin!, only: [:new, :create, :edit, :update, :destroy, :import]
   before_action :set_problem, only: [:show, :edit, :update, :destroy, :ranklist, :ranklist_old, :rejudge]
   before_action :set_testdata, only: [:show]
-  before_action :set_compiler, only: [:new, :edit]
+  before_action :set_compiler, only: [:new, :edit, :import]
   before_action :reduce_list, only: [:create, :update]
   before_action :check_visibility!, only: [:show, :ranklist, :ranklist_old]
   layout :set_contest_layout, only: [:show]
+
 
   def ranklist
     # avoid additional COUNT(*) query by to_a
@@ -99,6 +100,7 @@ class ProblemsController < ApplicationController
     @ban_compiler_ids = @problem.compilers.map(&:id).to_set
   end
 
+
   def create
     params[:problem][:compiler_ids] ||= []
     @problem = Problem.new(check_params())
@@ -143,7 +145,168 @@ class ProblemsController < ApplicationController
     end
   end
 
+  def import 
+    @problem = Problem.new
+    1.times { @problem.sample_testdata.build }
+    @ban_compiler_ids = Set[]
+  end
+  def import_create
+    params = check_import_parm
+    json = JSON.parse(params[:json_file].read)
+    my_params = transform_json_to_params(json)
+    puts "My params: #{my_params}"
+    my_params[:problem][:compiler_ids] ||= []
+
+    #create problem
+    @problem = Problem.new(check_params( my_params ))
+    @ban_compiler_ids = my_params[:problem][:compiler_ids].map(&:to_i).to_set
+
+    #check if problem save
+    puts "My problem: #{@problem.save}"
+
+    respond_to do |format|
+      if @problem.save
+        format.html { redirect_to @problem, notice: 'Problem was successfully created.' }
+        format.json { render action: 'show', status: :created, location: @problem }
+      else
+        format.html { render action: 'import' }
+        format.json { render json: @problem.errors, status: :unprocessable_entity }
+      end
+    end
+  end
   private
+
+  def transform_json_to_params(json)
+    ActionController::Parameters.new({
+      problem: make_import_custom_params_from_json(json)
+    }) ;
+  end
+  def make_import_custom_params_from_json(json)
+    # json 格式
+#     {
+#     "title": "1",
+#     "samplecode": "8",
+#     "problemid": "b111",
+#     "display": "practice",
+#     "difficulty": 0,
+#     "backgrounds": "[]",
+#     "keywords": "[]",
+#     "sortable": "",
+#     "scores": [100],
+#     "timelimits": [1.0],
+#     "hint": "<div id=\"MathJax_Message\" style=\"display: none;\">&nbsp;</div>\r\n<p>7</p>",
+#     "specialjudge_language": {
+#         "suffix": "python",
+#         "name": "PYTHON"
+#     },
+#     "inserttime": "2024-03-23 13:08:43.0",
+#     "memorylimit": 64,
+#     "sampleinput": "5",
+#     "sampleoutput": "6",
+#     "theinput": "<div id=\"MathJax_Message\" style=\"display: none;\">&nbsp;</div>\r\n<p>3</p>",
+#     "theoutput": "<div id=\"MathJax_Message\" style=\"display: none;\">&nbsp;</div>\r\n<p>4</p>",
+#     "updatetime": "2024-03-23 13:09:40.46",
+#     "testfilelength": 1,
+#     "judgemode": "Tolerant",
+#     "specialjudge_code": "",
+#     "author": "william1010121",
+#     "errmsg_visible": 1,
+#     "problemimages": [],
+#     "testinfiles": ["Upload Infile data!!\n"],
+#     "testoutfiles": ["Upload Outfile data!!\n"],
+#     "comment": "9",
+#     "reference": "[]",
+#     "locale": "zh_TW",
+#     "language": "C",
+#     "content": "<div id=\"MathJax_Message\" style=\"display: none;\">&nbsp;</div>\r\n<p>2</p>"
+# }
+    # visible state open=>public, practice=>contest, hide=>invisible
+    json["display"] = 
+      case json["display"]
+        when "open"       "public"
+        when "practice"   "contest"
+        when "hide"       "invisible"
+        else "public"
+        end
+
+
+    problem = 
+      {
+        "name": json["title"],
+        "tag_list": json["backgrounds"],
+        "solution_tag_list": json["keywords"],
+        "visible_state": json["display"] , # need to be complese
+        "description": json["content"],
+        "input": json["theinput"],
+        "output": json["theoutput"],
+        "sample_testdata_attributes": Array([]), # need to be complete
+        "subtasks_attributes": Array([]), # need to be complete,
+        "hint": json["hint"],
+        "source": json["author"] + "\nInsert time:#{json["inserttime"]}\n" + "Update time:#{json["updatetime"]}",
+        "discussion_visibility": "readonly",
+        "specjudge_type": "none",
+        "interlib_type": "none",
+        "num_stages": 1,
+        "score_precision": 2,
+        "specjudge_compiler_id": 1,
+        "specjudge_compile_args": "",
+        "sjcode": "",
+        "judge_between_stages":0,
+        "default_scoring_args": "",
+        "interlib": "",
+        "interlib_impl": "",
+        "code_length_limit": 5000000,
+        "ranklist_display_score": 0, # need to be complete
+        "skip_group":0,
+        "strict_mode": 0,
+        "verdict_ignore_td_list": "",
+        "testdata_attributes": Array([])
+      }
+
+      puts "My problem: #{problem}"
+      problem["sample_testdata_attributes"] ||= Array([])
+      problem["subtasks_attributes"] ||= Array([])
+      problem["sample_testdata_attributes"] << {
+        "input": json["sampleinput"],
+        "output": json["sampleoutput"],
+        "_destroy": "false"
+      }
+      for i in 0..json["scores"].length-1
+        problem["subtasks_attributes"] << {
+          "td_list": i,
+          "constraints": "",
+          "score": json["scores"][i],
+        }
+      end
+      # confirm the testinfile and testoutfile own the same length
+      if json["testinfiles"].length != json["testoutfiles"].length
+        raise "The length of testinfiles and testoutfiles are not the same"
+      end
+
+
+      folder_path = Dir.mktmpdir
+      problem["testdata_attributes"] ||= Array([])
+      for i in 0..json["testinfiles"].length-1
+        inputfile_path = "#{folder_path}/testinfiles#{i}.in"
+        outputfile_path = "#{folder_path}/testoutfiles#{i}.out"
+        inputfile = File.open(inputfile_path, "w");
+        outputfile = File.open(outputfile_path, "w");
+
+        inputfile.write(json["testinfiles"][i])
+        outputfile.write(json["testoutfiles"][i])
+
+        problem["testdata_attributes"] << {
+          "test_input":  inputfile,
+          "test_output": outputfile,
+          "time_limit": json["timelimits"][i],
+          "rss_limit": json["memorylimit"]*1024,
+          "vss_limit": 0,
+          "output_limit": 0
+        }
+      end
+
+      problem
+  end
 
   def set_problem
     @problem = Problem.find(params[:id])
@@ -206,8 +369,8 @@ class ProblemsController < ApplicationController
     end
   end
 
-  def check_params
-    params = problem_params.clone
+  def check_params(myparams = params)
+    params = problem_params(myparams).clone
     if params[:specjudge_type] != 'none' and not params[:specjudge_compiler_id] and not @problem&.specjudge_compiler_id
       params[:specjudge_compiler_id] = Compiler.order(order: :asc).first.id
     end
@@ -217,9 +380,14 @@ class ProblemsController < ApplicationController
     params
   end
 
-  # Never trust parameters from the scary internet, only allow the white list through.
-  def problem_params
+  def check_import_parm
     params.require(:problem).permit(
+      :json_file
+    );
+  end
+  # Never trust parameters from the scary internet, only allow the white list through.
+  def problem_params( my_params = params )
+    my_params.require(:problem).permit(
       :id,
       :name,
       :description,
@@ -267,6 +435,15 @@ class ProblemsController < ApplicationController
         :constraints,
         :score,
         :_destroy
+      ],
+      testdata_attributes:[
+        :problem_id,
+        :test_input,
+        :test_output,
+        :time_limit,
+        :rss_limit,
+        :vss_limit,
+        :output_limit,
       ]
     )
   end
