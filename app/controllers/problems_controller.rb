@@ -150,11 +150,35 @@ class ProblemsController < ApplicationController
     1.times { @problem.sample_testdata.build }
     @ban_compiler_ids = Set[]
   end
+  def unzip_zip_json_file(zip_file)
+    temp_file = Tempfile.new(zip_file.original_filename)
+
+    begin 
+      File.open(temp_file.path, "wb") do |file|
+        file.write(zip_file.read)
+      end
+
+      Zip::File.open(temp_file.path) do |zip_file|
+        zip_file.each do |entry|
+          return JSON.parse(entry.get_input_stream.read)
+        end
+      end
+
+    ensure
+      temp_file.close
+      temp_file.unlink
+    end
+  end
+
+
   def import_create
     params = check_import_parm
-    json = JSON.parse(params[:json_file].read)
-    my_params = transform_json_to_params(json)
-    puts "My params: #{my_params}"
+
+
+    json = unzip_zip_json_file(params[:json_file])
+    #puts "My json: #{json}"
+    my_params, folder_path = transform_json_to_params(json)
+    #puts "My params: #{my_params}"
     my_params[:problem][:compiler_ids] ||= []
 
     #create problem
@@ -162,8 +186,8 @@ class ProblemsController < ApplicationController
     @ban_compiler_ids = my_params[:problem][:compiler_ids].map(&:to_i).to_set
 
     #check if problem save
-    puts "My problem: #{@problem.save}"
-
+    # puts "My problem: #{@problem.save}"
+    remove_folder(folder_path)
     respond_to do |format|
       if @problem.save
         format.html { redirect_to @problem, notice: 'Problem was successfully created.' }
@@ -176,10 +200,15 @@ class ProblemsController < ApplicationController
   end
   private
 
+  def remove_folder(folder_path)
+    FileUtils.remove_entry folder_path
+  end
   def transform_json_to_params(json)
-    ActionController::Parameters.new({
-      problem: make_import_custom_params_from_json(json)
-    }) ;
+    custom_params, folder_path = make_import_custom_params_from_json(json)
+    my_params = ActionController::Parameters.new({
+      problem: custom_params
+    });
+    return my_params, folder_path
   end
   def make_import_custom_params_from_json(json)
     # json 格式
@@ -263,7 +292,7 @@ class ProblemsController < ApplicationController
         "testdata_attributes": Array([])
       }
 
-      puts "My problem: #{problem}"
+      #puts "My problem: #{problem}"
       problem["sample_testdata_attributes"] ||= Array([])
       problem["subtasks_attributes"] ||= Array([])
       problem["sample_testdata_attributes"] << {
@@ -305,7 +334,7 @@ class ProblemsController < ApplicationController
         }
       end
 
-      problem
+      return problem, folder_path
   end
 
   def set_problem

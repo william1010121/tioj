@@ -1,11 +1,143 @@
 <h4 class="page-header">New Problem</h4>
 
 <% @isNewProblem = true %>
-<%= form_with model: @problem, url: :import_create_problems,  method: :post, multipart: true do |f|%>
+<%= form_with model: @problem, url: :import_create_problems,  method: :post, multipart: true, id: "problem-form" do |f|%>
     <%= render partial: "shared/errors", locals: {errors: @problem.errors, item: 'problem'} %>
     <%= puts :import_create_problems %>
     <%=  f.file_field :json_file %>
     <%=  f.submit 'Import', class: 'btn btn-primary' %>
 <% end %>
 
+<!-- make prgress bar -->
+<div class="fade" id="progress-fade" style="flex: 1 0 0%;">
+    <div class="progress progress-striped active" role="progressbar" style="margin-bottom: 0.25em; border-radius: 4px; height: 20px; background: #f0faf0;">
+        <div id="progress-inner-bar" class="progress-bar progress-bar-success" style="width: 0%;"></div>
+    </div>
+        <div id="progress-text" class="progress-extended small"></div>
+</div>
+
 <%= link_to 'Back to Problems List', problems_path, class: 'btn btn-default btn-xs' %>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.6.0/jszip.min.js"></script>
+<script>
+$(function(){ $('#problem-form').submit(function(event){
+    event.preventDefault();
+    let Url = $("form").attr('action');
+    console.log(Url);
+    console.log( this.elements)
+    console.log( this.elements["problem[json_file]"].files[0] );
+
+
+    var _formatFileSize = function (bytes) {
+      if (typeof bytes !== 'number') {
+        return '';
+      }
+      if (bytes >= (1024*1024*1024)) {
+        return (bytes / (1024*1024*1024)).toFixed(2) + ' GiB';
+      }
+      if (bytes >= (1024*1024)) {
+        return (bytes / (1024*1024)).toFixed(2) + ' MiB';
+      }
+      if (bytes >= 1024) {
+        return (bytes / 1024).toFixed(2) + ' KiB';
+      }
+      return (bytes * 1.0).toFixed(2) + ' byte';
+    };
+    var _formatTime = function (seconds) {
+      var date = new Date(seconds * 1000), days = Math.floor(seconds / 86400);
+      days = days ? days + 'd ' : '';
+      if (date.getUTCHours() > 1) {
+        days = days + ('0' + date.getUTCHours()).slice(-2) + ':';
+      }
+      return (
+        days +
+        ('0' + date.getUTCMinutes()).slice(-2) +
+        ':' +
+        ('0' + date.getUTCSeconds()).slice(-2)
+      );
+    };
+    var _formatPercentage = function (floatValue) {
+      return (floatValue * 100).toFixed(2) + ' %';
+    };
+    var _renderProgress = function (data) {
+      return (
+        _formatPercentage(data.loaded / data.total) +
+        ' | ' +
+        _formatFileSize(data.loaded) +
+        ' / ' +
+        _formatFileSize(data.total) +
+        ' | ETA ' +
+        _formatTime((data.total - data.loaded) / (data.byterate)) +
+        ' | ' +
+        _formatFileSize(data.byterate) +
+        '/s'
+      );
+    };
+
+
+    var fileZip = new JSZip();
+    let file = this.elements["problem[json_file]"].files[0];
+    var prevLoaded = 0;
+    var byterate = 0;
+    var lastUpdate = new Date().getTime();
+
+    fileZip.file( file.name, file);
+    fileZip.generateAsync({type:"blob", compression: "DEFLATE", compressionOptions: {level: 9}}, function updateCallback(metadata) {
+        $('#progress-fade').addClass('in');
+        $('#progress-inner-bar').css('width', (metadata.percent) + '%');
+        $('#progress-text').text(`file is zipping: ${Math.round(metadata.percent)}%`)
+        console.log(metadata);
+        console.log(_renderProgress(metadata));
+    }).then(function(content) {
+        $('#progress-text').text('Uploading file');
+      console.log(content);
+      var formData = new FormData();
+      formData.append('problem[json_file]', content, file.name);
+      $.ajax({
+        url: Url,
+        type: 'POST',
+        data: formData,
+        cache: false,
+        contentType: false,
+        processData: false,
+        xhr: function() {
+            var xhr = new window.XMLHttpRequest();
+            xhr.upload.onprogress = function(evt) {
+              if (evt.lengthComputable) {
+                var now = new Date().getTime();
+                $('#progress-fade').addClass('in');
+                if (evt.loaded == evt.total) {
+                  $('#progress-inner-bar').width('100%');
+                  $('#progress-text').text('Processing...');
+                } else if (now - lastUpdate >= 500) {
+                  var curByterate = ((evt.loaded - prevLoaded) / (now - lastUpdate)) * 1000;
+                  evt.byterate = byterate * 0.7 + curByterate * 0.3;
+                  byterate = evt.byterate;
+                  evt.byterate = curByterate;
+                  lastUpdate = now;
+                  prevLoaded = evt.loaded;
+                  $('#progress-text').text(_renderProgress(evt));
+                  $('#progress-inner-bar').width((evt.loaded / evt.total * 100) + '%');
+                }
+              }
+            };
+          return xhr;
+        },
+        success: function (data) {
+            document.open();
+            document.write(data);
+            document.close();
+        },
+        error: function (xhr, status, error) {
+            $('#progress-fade').removeClass('in');
+            $('#progress-inner-bar').width('0%');
+        },
+        abort: function() {
+            $('#progress-fade').removeClass('in');
+            $('#progress-inner-bar').width('0%');
+        },
+      });
+    });
+})});
+
+</script>
