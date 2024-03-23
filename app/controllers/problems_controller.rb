@@ -155,16 +155,18 @@ class ProblemsController < ApplicationController
     my_params = transform_json_to_params(json)
     my_params[:problem][:compiler_ids] ||= []
 
-
+    #create problem
     @problem = Problem.new(check_params( my_params ))
     @ban_compiler_ids = my_params[:problem][:compiler_ids].map(&:to_i).to_set
+
+    #create testdata
 
     respond_to do |format|
       if @problem.save
         format.html { redirect_to @problem, notice: 'Problem was successfully created.' }
         format.json { render action: 'show', status: :created, location: @problem }
       else
-        format.html { render action: 'new' }
+        format.html { render action: 'import' }
         format.json { render json: @problem.errors, status: :unprocessable_entity }
       end
     end
@@ -234,9 +236,10 @@ class ProblemsController < ApplicationController
         "description": json["content"],
         "input": json["theinput"],
         "output": json["theoutput"],
-        "sample_testdata_attributes": [], # need to be complete
+        "sample_testdata_attributes": Array([]), # need to be complete
+        "subtasks_attributes": Array([]), # need to be complete,
         "hint": json["hint"],
-        "source": json["author"],
+        "source": json["author"] + "\nInsert time:#{json["inserttime"]}\n" + "Update time:#{json["updatetime"]}",
         "discussion_visibility": "readonly",
         "specjudge_type": "none",
         "interlib_type": "none",
@@ -255,6 +258,25 @@ class ProblemsController < ApplicationController
         "strict_mode": 0,
         "verdict_ignore_td_list": ""
       }
+
+      puts "My problem: #{problem}"
+      problem["sample_testdata_attributes"] ||= Array([])
+      problem["subtasks_attributes"] ||= Array([])
+      problem["sample_testdata_attributes"] << {
+        "input": json["sampleinput"],
+        "output": json["sampleoutput"],
+        "destroy": "false"
+      }
+      for i in 0..json["scores"].length-1
+        problem["subtasks_attributes"] << {
+          "td_list": i,
+          "constraints": "",
+          "score": json["scores"][i],
+          "destroy": "false"
+        }
+      end
+
+      problem
   end
 
   def set_problem
