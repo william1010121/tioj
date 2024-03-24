@@ -35,21 +35,25 @@ class TestdataController < ApplicationController
 
   def create
     @testdatum = @problem.testdata.build(testdatum_params)
-    # build from problem, if not save rasing error
-    if @testdatum.save == false
-      raise {error:'Testdatum was not successfully created.'}
+
+    respond_to do |format|
+      if @testdatum.save
+        format.html { redirect_to problem_testdata_path(@problem), notice: 'Testdatum was successfully created.' }
+        #format.json { render action: 'show', status: :created, location: prob_testdata_path(@problem, @testdatum) }
+      else
+        format.html { render action: 'new' }
+        format.json { render json: @testdatum.errors, status: :unprocessable_entity }
+      end
     end
 
   end
 
+  def batch_create_edit
+    @testdatum = @problem.testdata.build
+  end
   def batch_create
 
     testdata_errors = []
-    #print testdatum_params_list.size
-
-    # testdatum_params_list.each do |p|
-    #   puts p
-    # end
     testdatum_params_list, test_input_folder, test_output_folder = unzip_testdatum_params_list
 
     testdatum_params_list.each do |testdatum_params|
@@ -208,7 +212,6 @@ class TestdataController < ApplicationController
     Zip::File.open(zip_file_path) do |zip|
       zip.each do |entry|
         # Extract to file/directory/symlink
-        puts "Extracting #{entry.name}"
         entry.extract("#{tmp_folder}/#{entry.name}")
       end
     end
@@ -239,8 +242,6 @@ class TestdataController < ApplicationController
     test_input_folder = unzip_folder(new_params[:test_input_list].path)
     test_output_folder = unzip_folder(new_params[:test_output_list].path)
 
-    puts "test_input_list: #{test_input_folder}"
-    puts "test_output_list: #{test_output_folder}"
 
     test_input = Dir.foreach(test_input_folder)
                   .reject{ |item| item == '.' or item == '..' }
@@ -256,8 +257,6 @@ class TestdataController < ApplicationController
                   .map{ |file_name| File.open(file_name, 'rb') }
 
     # making the zip file to be like the fileList
-    puts "test_input: #{test_input}"
-    puts "test_output: #{test_output}"
 
     new_params_list = []
 
@@ -270,8 +269,6 @@ class TestdataController < ApplicationController
         params[:test_input] = item1
         params[:test_output] = item2
 
-        puts "test_input: #{params[:test_input]}"
-        puts "test_output: #{params[:test_output]}"
 
         if params[:test_input]
           params[:input_compressed] = false

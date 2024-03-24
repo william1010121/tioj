@@ -176,9 +176,7 @@ class ProblemsController < ApplicationController
 
 
     json = unzip_zip_json_file(params[:json_file])
-    #puts "My json: #{json}"
     my_params, folder_path = transform_json_to_params(json)
-    #puts "My params: #{my_params}"
     my_params[:problem][:compiler_ids] ||= []
 
     #create problem
@@ -186,7 +184,6 @@ class ProblemsController < ApplicationController
     @ban_compiler_ids = my_params[:problem][:compiler_ids].map(&:to_i).to_set
 
     #check if problem save
-    # puts "My problem: #{@problem.save}"
     remove_folder(folder_path)
     respond_to do |format|
       if @problem.save
@@ -292,7 +289,6 @@ class ProblemsController < ApplicationController
         "testdata_attributes": Array([])
       }
 
-      #puts "My problem: #{problem}"
       problem["sample_testdata_attributes"] ||= Array([])
       problem["subtasks_attributes"] ||= Array([])
       problem["sample_testdata_attributes"] << {

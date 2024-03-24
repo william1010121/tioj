@@ -23,9 +23,6 @@
 $(function(){ $('#problem-form').submit(function(event){
     event.preventDefault();
     let Url = $("form").attr('action');
-    console.log(Url);
-    console.log( this.elements)
-    console.log( this.elements["problem[json_file]"].files[0] );
 
 
     var _formatFileSize = function (bytes) {
@@ -86,11 +83,8 @@ $(function(){ $('#problem-form').submit(function(event){
         $('#progress-fade').addClass('in');
         $('#progress-inner-bar').css('width', (metadata.percent) + '%');
         $('#progress-text').text(`file is zipping: ${Math.round(metadata.percent)}%`)
-        console.log(metadata);
-        console.log(_renderProgress(metadata));
     }).then(function(content) {
         $('#progress-text').text('Uploading file');
-      console.log(content);
       var formData = new FormData();
       formData.append('problem[json_file]', content, file.name);
       $.ajax({
