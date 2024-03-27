@@ -8,8 +8,7 @@
 
 <% if current_user&.admin? %>
   <%= link_to 'New Problem', new_problem_path, class: 'btn btn-success btn-sm' %>
-  <%= link_to 'Import Problem', import_problems_path, class: 'btn btn-success btn-sm' %>
-  <br>
+  <%= link_to 'import Problem', import_problems_path,class: 'btn btn-success btn-sm'%>
 <% end %>
 
 <form class="form-inline search-form" accept-charset="UTF-8" method="get">

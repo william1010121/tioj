@@ -18,7 +18,7 @@
 
 <%= link_to 'Back to Problems List', problems_path, class: 'btn btn-default btn-xs' %>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.6.0/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.0/jszip.min.js"></script>
 <script>
 $(function(){ $('#problem-form').submit(function(event){
     event.preventDefault();
@@ -80,15 +80,22 @@ $(function(){ $('#problem-form').submit(function(event){
     var prevLoaded = 0;
     var byterate = 0;
     var lastUpdate = new Date().getTime();
+    let date = new Date();
+
+    
 
     fileZip.file( file.name, file);
-    fileZip.generateAsync({type:"blob", compression: "DEFLATE", compressionOptions: {level: 9}}, function updateCallback(metadata) {
-        $('#progress-fade').addClass('in');
-        $('#progress-inner-bar').css('width', (metadata.percent) + '%');
-        $('#progress-text').text(`file is zipping: ${Math.round(metadata.percent)}%`)
-        console.log(metadata);
-        console.log(_renderProgress(metadata));
+    fileZip.generateAsync({type:"blob", compression: "DEFLATE", streamFiles: true, compressionOptions: {level: 9}}, function updateCallback(metadata) {
+        setTimeout( function() {
+            $('#progress-fade').addClass('in');
+            $('#progress-inner-bar').width(Math.round(metadata.percent) + '%');
+            $('#progress-text').text(`file is zipping: ${Math.round(metadata.percent)}%`)
+        }, 10);
     }).then(function(content) {
+      console.log(`use time: ${(new Date() - date)/1000.0} s`);
+      console.log(`file original size: ${file.size/1000.0} MB`);
+      console.log(`file zipped size: ${content.size} MB`);
+      date = new Date();
         $('#progress-text').text('Uploading file');
       console.log(content);
       var formData = new FormData();
@@ -124,6 +131,8 @@ $(function(){ $('#problem-form').submit(function(event){
           return xhr;
         },
         success: function (data) {
+          console.log("success");
+          console.log(`use time: ${(new Date() - date)/1000.0} s`);
             document.open();
             document.write(data);
             document.close();

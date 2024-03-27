@@ -44,6 +44,7 @@ class TestdataController < ApplicationController
         format.html { render action: 'new' }
         format.json { render json: @testdatum.errors, status: :unprocessable_entity }
       end
+    end
   end
 
   def batch_create_edit
