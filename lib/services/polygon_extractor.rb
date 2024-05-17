@@ -86,34 +86,8 @@ class PolygonExtractor
 
 
   def process_checker(entry,description)
-    checker_code = entry.get_input_stream.read.split("\n");
-    is_main = false;
-
-    main_regex = /int\s+main\s*\(\s*int\s+argc\s*,\s*char\s*\*\s*argv\[\s*\]\s*\)/
-    checker_code.map! do |line|
-      line = process_main(line, is_main)
-      is_main = true if line =~ main_regex
-      process_line(line)
-    end
-
-    description["checker"] = checker_code.join("\n")
+    description["checker"] = entry.get_input_stream.read
   end
-
-  def process_main(line,is_main)
-    return line unless is_main
-    line.sub(/(^\s*\{\s*|^\s*)/, '\1 char *fargv[4] = {argv[0], argv[2], argv[1], argv[3]};')
-  end
-
-  def process_line(line)
-    if line =~ /quitf\s*\(\s*_ok/
-      line.sub(/(^\s*\{\s*|^\s*)/, '\1 puts("0"),')
-    elsif line.include?("registerTestlibCmd")
-      " registerTestlibCmd(4, fargv);"
-    else
-      line
-    end
-  end
-
 
   def process_test_files(entry,description)
     match_data = entry.name.match(/^tests\/(\d+)(\.a)?$/)
@@ -141,7 +115,6 @@ class PolygonExtractor
      }
 
     if entry.name =~ @problem_propertis_regex
-        puts "problem properties"
         problem_properties = JSON.parse(entry.get_input_stream.read)
         description["memoryLimit"] = problem_properties["memoryLimit"]
         description["timeLimit"] = problem_properties["timeLimit"]/1000

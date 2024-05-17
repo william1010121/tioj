@@ -80,6 +80,8 @@ module ProblemsHelper
       "none" => "Default compare",
       "old" => "Old-style special judge",
       "new" => "New-style special judge",
+      "zj"   => "zerojudge special judge",
+      "polygon" => "Polygon checker",
     }
   end
 

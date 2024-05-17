@@ -17,10 +17,6 @@ class ProblemFormatTransformer
   def extract_zerojudge_problem(zipped_file, folder_path)
 
     begin
-      # temp_zip_path = File.join(folder_path, "temp.zip")
-      # File.open(temp_zip_path, "wb") do |file|
-      #   file.write(zipped_file.read)
-      # end
 
       Zip::File.open_buffer(zipped_file.read) do |zip_file|
 
@@ -100,6 +96,14 @@ class ProblemFormatTransformer
     @problem.output = json["theoutput"]
     @problem.hint = json["hint"]
     @problem.source = json["author"] + "\nInsert time:#{json["inserttime"]}\n" + "Update time:#{json["updatetime"]}"
+    # c++ => 2 #python =>11
+    #binding.remote_pry
+    if json["judgemode"] == "Special"
+      @problem.specjudge_type = "zj"
+      @problem.sjcode = json["specialjudge_code"]
+      @problem.specjudge_compiler_id = ( json["specialjudge_language"]["suffix"] == "cpp" ? 2 : 11)
+    end
+
 
     @problem.sample_testdata.build(
       input: json["sampleinput"],
@@ -108,7 +112,7 @@ class ProblemFormatTransformer
 
     json["scores"].each_with_index do |score,i|
       @problem.subtasks.build(
-        td_list: 1,
+        td_list: i,
         constraints: "",
         score: score
       );
@@ -158,7 +162,7 @@ class ProblemFormatTransformer
     @problem.description = description["legend"]
     @problem.input = description["input"]
     @problem.output = description["output"]
-    @problem.specjudge_type = "old"
+    @problem.specjudge_type = "polygon"
     @problem.interlib_type = "none"
     @problem.sjcode = description["checker"]
     @problem.hint = description["note"]
@@ -269,7 +273,7 @@ class ProblemFormatTransformer
 
 
   def zjson_permit_key
-    ["title","backgrounds","keywords","display","content","theinput","theoutput","hint","author","inserttime","updatetime","testinfiles","testoutfiles","scores","timelimits","memorylimit","sampleinput","sampleoutput"]
+    ["title","backgrounds","keywords","display","content","theinput","theoutput","hint","author","inserttime","updatetime","testinfiles","testoutfiles","scores","timelimits","memorylimit","sampleinput","sampleoutput", "judgemode", "specialjudge_code", "specialjudge_language"]
   end
 
   def poloygon_permit_key

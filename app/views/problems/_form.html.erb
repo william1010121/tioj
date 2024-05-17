@@ -161,16 +161,16 @@
     </div>
   </div>
 
-  <div class="form-group visibility-specjudge visibility-specjudge-old visibility-specjudge-new">
+  <div class="form-group visibility-specjudge visibility-specjudge-old visibility-specjudge-new visibility-specjudge-zj visibility-specjudge-polygon">
     <%= f.label :specjudge_compiler_id, "Special Judge Compiler" %>
     <%= f.select :specjudge_compiler_id, options_for_select(@compiler.map{|x| [x.description, x.id]}, @problem.specjudge_compiler_id || @compiler[0].id),
         {}, {class: 'form-control flat'} %>
   </div>
-  <div class="form-group visibility-specjudge visibility-specjudge-old visibility-specjudge-new">
+  <div class="form-group visibility-specjudge visibility-specjudge-old visibility-specjudge-new visibility-specjudge-polygon">
     <%= f.label :specjudge_compile_args, 'Additional compilation arguments of special judge program' %>
     <%= f.text_field :specjudge_compile_args, class: 'form-control flat' %>
   </div>
-  <div class="form-group visibility-specjudge visibility-specjudge-old visibility-specjudge-new">
+  <div class="form-group visibility-specjudge visibility-specjudge-old visibility-specjudge-new visibility-specjudge-zj visibility-specjudge-polygon">
     <%= f.label :sjcode, help_collapse_toggle('Special Judge Code', 'sjDescription') %>
     <div class="collapse" id="sjDescription" style="height: auto;">
       <div class="panel panel-default">
@@ -253,6 +253,10 @@
               <li>Specifying <code>time_us</code>, <code>vss_kib</code> or <code>rss_kib</code> will override the displayed time / memory value. Overriding <code>time_us</code> in intermediate stages also changes <code>current_time_us</code> and thus effectively changes the time limit of the remaining stages (calculated by TL - <code>current_time_us</code>), so it is possible to set adaptive time limits using this behavior.</li>
             </ul>
           </div>
+          <div class="visibility-specjudge visibility-specjudge-zj">
+          </div>
+          <div class="visibility-specjudge visibility-specjudge-polygon">
+          </div>
           <div style="line-height: 1.4;">
             <code>#include "testlib.h"</code> (<a href="https://github.com/MikeMirzayanov/testlib/tree/6daa79fdc9c2b113be8d40f828e3dc81e67ce33d">docs</a>) and <code>#include "nlohmann/json.hpp"</code> (<a href="https://github.com/nlohmann/json/tree/v3.10.5">docs</a>) are provided for C++ special judge programs. If you're using <code>testlib</code>, note that the <code>argv</code> format of TIOJ is different from that required by the library, thus some preprocessing is needed before calling <code>registerTestlibCmd</code>.
           </div>
@@ -261,7 +265,7 @@
     </div>
     <%= f.text_area :sjcode, class: 'form-control flat code-input', rows: '7' %>
   </div>
-  <div class="form-group visibility-specjudge visibility-specjudge-old visibility-specjudge-new">
+  <div class="form-group visibility-specjudge visibility-specjudge-old visibility-specjudge-new visibility-specjudge-zj visibility-specjudge-polygon">
     <%= f.label :judge_between_stages, class: 'checkbox' do %>
       <%= f.check_box :judge_between_stages, 'data-toggle': 'checkbox' %>
       Invoke special judge between stages (only applicable if number of stages &gt; 1)

@@ -342,6 +342,9 @@ GEM
     ruby2_keywords (0.0.5)
     rubyntlm (0.6.3)
     rubyzip (2.3.2)
+    sanitize (6.1.0)
+      crass (~> 1.0.2)
+      nokogiri (>= 1.12.0)
     sassc (2.4.0)
       ffi (~> 1.9)
     sassc-rails (2.1.2)
@@ -446,6 +449,7 @@ DEPENDENCIES
   redcarpet
   redis (~> 4)
   rubyzip
+  sanitize
   sassc-rails
   sdoc
   selenium-webdriver

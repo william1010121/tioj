@@ -1,4 +1,5 @@
 require 'redcarpet'
+require 'sanitize'
 module ApplicationHelper
   def markdown(text)
     if text == nil
@@ -13,7 +14,9 @@ module ApplicationHelper
       strikethrough: true,
       superscript: false
     }
-    Redcarpet::Markdown.new(renderer, options).render(text).html_safe
+    raw_html = Redcarpet::Markdown.new(renderer, options).render(text).html_safe
+    sanitize_html = Sanitize.fragment(raw_html, Sanitize::Config::RELAXED)
+    sanitize_html.html_safe
   end
 
   def markdown_no_p(text)
