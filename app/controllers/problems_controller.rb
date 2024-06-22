@@ -1,11 +1,12 @@
 class ProblemsController < ApplicationController
   before_action :authenticate_user_and_running_if_single_contest!, only: [:show]
-  before_action :authenticate_admin!, only: [:new, :create, :edit, :update, :destroy]
+  before_action :authenticate_admin!, only: [:new, :create]
   before_action :set_problem, only: [:show, :edit, :update, :destroy, :ranklist, :ranklist_old, :rejudge]
   before_action :set_testdata, only: [:show]
   before_action :set_compiler, only: [:new, :edit]
   before_action :reduce_list, only: [:create, :update]
   before_action :check_visibility!, only: [:show, :ranklist, :ranklist_old]
+  before_action :authenticate_resource!, only: [:show, :edit, :update, :destroy, :ranklist, :ranklist_old, :rejudge]
   layout :set_contest_layout, only: [:show]
 
   def ranklist
@@ -84,6 +85,7 @@ class ProblemsController < ApplicationController
   end
 
   def show
+    puts "Show the Problem"
     @tdlist = inverse_td_list(@problem)
   end
 
@@ -103,6 +105,7 @@ class ProblemsController < ApplicationController
   def create
     params[:problem][:compiler_ids] ||= []
     @problem = Problem.new(check_params())
+    @problem.user_id = current_user.id
     @ban_compiler_ids = params[:problem][:compiler_ids].map(&:to_i).to_set
     respond_to do |format|
       if @problem.save

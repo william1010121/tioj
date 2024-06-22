@@ -25,30 +25,39 @@
     <%= link_to 'Back to Problems List', @contest.blank? ? problems_path : contest_adaptive_polymorphic_path([]), class: 'btn btn-default btn-xs btn-block' %>
   </div>
 </div>
-<% if effective_admin? %>
+<% can_update = can? :update, @problem%>
+<% can_rejudge = can? :rejudge, @problem%>
+<% can_destroy = can? :destroy, @problem%>
+<% if can_update or can_destroy or can_rejudge %>
   <div class="row" style="padding-top:10px;">
+    <% if can_update %>
     <div class="col-md-2">
       <%= link_to 'Edit', edit_problem_path(@problem), class: 'btn btn-info btn-xs btn-block' %>
     </div>
     <div class="col-md-2">
       <%= link_to 'Manage Testdata', problem_testdata_path(@problem), class: 'btn btn-warning btn-xs btn-block' %>
     </div>
-    <div class="col-md-2">
-      <% if @contest %>
-        <%= form_with url: rejudge_contest_problem_path(@contest, @problem) do |f| %>
-          <%= f.submit 'Rejudge in Contest', data: {confirm: "Are you really going to rejudge the whole problem in this contest? Out-of-contest submissions won't be affected."}, class: 'btn btn-inverse btn-xs btn-block' %>
+    <% end %>
+    <% if can_rejudge %>
+      <div class="col-md-2">
+        <% if @contest %>
+          <%= form_with url: rejudge_contest_problem_path(@contest, @problem) do |f| %>
+            <%= f.submit 'Rejudge in Contest', data: {confirm: "Are you really going to rejudge the whole problem in this contest? Out-of-contest submissions won't be affected."}, class: 'btn btn-inverse btn-xs btn-block' %>
+          <% end %>
+        <% else %>
+          <%= form_with url: rejudge_problem_path(@problem) do |f| %>
+            <%= f.submit 'Rejudge', data: {confirm: "Are you really going to rejudge the whole problem? Contest submissions won't be affected."}, class: 'btn btn-inverse btn-xs btn-block' %>
+          <% end %>
         <% end %>
-      <% else %>
-        <%= form_with url: rejudge_problem_path(@problem) do |f| %>
-          <%= f.submit 'Rejudge', data: {confirm: "Are you really going to rejudge the whole problem? Contest submissions won't be affected."}, class: 'btn btn-inverse btn-xs btn-block' %>
+      </div>
+    <% end %>
+    <% if can_destroy %>
+      <div class="col-md-2">
+        <%= form_with url: delsub_problem_path(@problem) do |f| %>
+          <%= f.submit 'Delete All Submissions', data: {confirm: 'Are you really going to delete ALL submissions to this problem?'}, class: 'btn btn-danger btn-xs btn-block' %>
         <% end %>
-      <% end %>
-    </div>
-    <div class="col-md-2">
-      <%= form_with url: delsub_problem_path(@problem) do |f| %>
-        <%= f.submit 'Delete All Submissions', data: {confirm: 'Are you really going to delete ALL submissions to this problem?'}, class: 'btn btn-danger btn-xs btn-block' %>
-      <% end %>
-    </div>
+      </div>
+    <% end %>
   </div>
 <% end %>
 </p>

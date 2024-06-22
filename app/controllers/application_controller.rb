@@ -11,6 +11,7 @@ class ApplicationController < ActionController::Base
   mattr_accessor :v2i
   mattr_accessor :i2v
   helper_method :effective_admin?
+  require "pry-remote"
 
   include SingleContestAuthenticationConcern
 
@@ -47,6 +48,13 @@ class ApplicationController < ActionController::Base
   }
   @@i2v = @@v2i.map{|x, y| [y, x]}.to_h
 
+  rescue_from CanCan::AccessDenied do |exception|
+    respond_to do |format|
+      format.json { head :forbidden }
+      format.html { redirect_to root_path, alert: "Insufficient User Permissions." }
+    end
+  end
+
   def set_verdict_hash
     @verdict = @@verdict
     @v2i = @@v2i
@@ -74,7 +82,23 @@ class ApplicationController < ActionController::Base
  protected
   def authenticate_admin!
     authenticate_user!
-    if not current_user.admin?
+
+    if cannot? action_name.to_sym, controller_name.singularize.classify.constantize
+      flash[:alert] = 'Insufficient User Permissions.'
+      redirect_to action: 'index'
+      return
+    end
+  end
+
+  def current_resource
+    instance_variable_get("@#{controller_name.singularize}")
+  end
+  def authenticate_resource!
+    #binding.remote_pry
+    if current_resource.nil?
+      raise_not_found
+    end
+    if cannot? action_name.to_sym, current_resource
       flash[:alert] = 'Insufficient User Permissions.'
       redirect_to action: 'index'
       return

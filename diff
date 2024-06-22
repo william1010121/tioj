@@ -1,0 +1,1397 @@
+diff --git a/Gemfile b/Gemfile
+index cc98364..e9a08c8 100644
+--- a/Gemfile
++++ b/Gemfile
+@@ -104,3 +104,8 @@ group :test do
+   gem 'selenium-webdriver'
+   gem 'puma'
+ end
++
++
++gem 'cancancan'
++
++gem 'pry-remote'
+diff --git a/Gemfile.lock b/Gemfile.lock
+index 93daf87..51a7d86 100644
+--- a/Gemfile.lock
++++ b/Gemfile.lock
+@@ -106,6 +106,7 @@ GEM
+     bullet (7.1.6)
+       activesupport (>= 3.0.0)
+       uniform_notifier (~> 1.11)
++    cancancan (3.6.1)
+     capybara (3.40.0)
+       addressable
+       matrix
+@@ -123,6 +124,7 @@ GEM
+       marcel (~> 1.0.0)
+       ssrf_filter (~> 1.0)
+     cgi (0.4.1)
++    coderay (1.1.3)
+     concurrent-ruby (1.2.3)
+     connection_pool (2.4.1)
+     crass (1.0.6)
+@@ -268,6 +270,12 @@ GEM
+     passenger (6.0.20)
+       rack
+       rake (>= 0.8.1)
++    pry (0.14.2)
++      coderay (~> 1.1)
++      method_source (~> 1.0)
++    pry-remote (0.1.8)
++      pry (~> 0.9)
++      slop (~> 3.0)
+     psych (5.1.2)
+       stringio
+     public_suffix (5.0.4)
+@@ -351,6 +359,7 @@ GEM
+     sentry-ruby (5.17.1)
+       bigdecimal
+       concurrent-ruby (~> 1.0, >= 1.0.2)
++    slop (3.6.0)
+     snaky_hash (2.0.1)
+       hashie
+       version_gem (~> 1.1, >= 1.1.1)
+@@ -405,6 +414,7 @@ DEPENDENCIES
+   annotate
+   bootsnap
+   bullet
++  cancancan
+   capybara
+   carrierwave
+   devise
+@@ -422,6 +432,7 @@ DEPENDENCIES
+   omniauth
+   omniauth-facebook
+   passenger (~> 6)
++  pry-remote
+   puma
+   rails (~> 7)
+   rdoc (~> 6)
+diff --git a/app/admin/user.rb b/app/admin/user.rb
+index 4f4bac2..6b81b19 100644
+--- a/app/admin/user.rb
++++ b/app/admin/user.rb
+@@ -1,5 +1,5 @@
+ ActiveAdmin.register User do
+-  permit_params :email, :nickname, :admin, :avatar_url, :motto, :school, :gradyear, :name
++  permit_params :email, :nickname, :admin, :avatar_url, :motto, :school, :gradyear, :name, :role
+ 
+   index do
+     selectable_column
+diff --git a/app/controllers/application_controller.rb b/app/controllers/application_controller.rb
+index 781df46..491363b 100644
+--- a/app/controllers/application_controller.rb
++++ b/app/controllers/application_controller.rb
+@@ -11,6 +11,7 @@ class ApplicationController < ActionController::Base
+   mattr_accessor :v2i
+   mattr_accessor :i2v
+   helper_method :effective_admin?
++  require "pry-remote"
+ 
+   include SingleContestAuthenticationConcern
+ 
+@@ -47,6 +48,13 @@ class ApplicationController < ActionController::Base
+   }
+   @@i2v = @@v2i.map{|x, y| [y, x]}.to_h
+ 
++  rescue_from CanCan::AccessDenied do |exception|
++    respond_to do |format|
++      format.json { head :forbidden }
++      format.html { redirect_to root_path, alert: "Insufficient User Permissions." }
++    end
++  end
++
+   def set_verdict_hash
+     @verdict = @@verdict
+     @v2i = @@v2i
+@@ -74,7 +82,23 @@ class ApplicationController < ActionController::Base
+  protected
+   def authenticate_admin!
+     authenticate_user!
+-    if not current_user.admin?
++
++    if cannot? action_name.to_sym, controller_name.singularize.classify.constantize
++      flash[:alert] = 'Insufficient User Permissions.'
++      redirect_to action: 'index'
++      return
++    end
++  end
++
++  def current_resource
++    instance_variable_get("@#{controller_name.singularize}")
++  end
++  def authenticate_resource!
++    #binding.remote_pry
++    if current_resource.nil?
++      raise_not_found
++    end
++    if cannot? action_name.to_sym, current_resource
+       flash[:alert] = 'Insufficient User Permissions.'
+       redirect_to action: 'index'
+       return
+diff --git a/app/controllers/problems_controller.rb b/app/controllers/problems_controller.rb
+index 4009001..50c2575 100644
+--- a/app/controllers/problems_controller.rb
++++ b/app/controllers/problems_controller.rb
+@@ -1,11 +1,12 @@
+ class ProblemsController < ApplicationController
+   before_action :authenticate_user_and_running_if_single_contest!, only: [:show]
+-  before_action :authenticate_admin!, only: [:new, :create, :edit, :update, :destroy]
++  before_action :authenticate_admin!, only: [:new, :create]
+   before_action :set_problem, only: [:show, :edit, :update, :destroy, :ranklist, :ranklist_old, :rejudge]
+   before_action :set_testdata, only: [:show]
+   before_action :set_compiler, only: [:new, :edit]
+   before_action :reduce_list, only: [:create, :update]
+   before_action :check_visibility!, only: [:show, :ranklist, :ranklist_old]
++  before_action :authenticate_resource!, only: [:show, :edit, :update, :destroy, :ranklist, :ranklist_old, :rejudge]
+   layout :set_contest_layout, only: [:show]
+ 
+   def ranklist
+@@ -84,6 +85,7 @@ class ProblemsController < ApplicationController
+   end
+ 
+   def show
++    puts "Show the Problem"
+     @tdlist = inverse_td_list(@problem)
+   end
+ 
+@@ -103,6 +105,7 @@ class ProblemsController < ApplicationController
+   def create
+     params[:problem][:compiler_ids] ||= []
+     @problem = Problem.new(check_params())
++    @problem.user_id = current_user.id
+     @ban_compiler_ids = params[:problem][:compiler_ids].map(&:to_i).to_set
+     respond_to do |format|
+       if @problem.save
+diff --git a/app/controllers/testdata_controller.rb b/app/controllers/testdata_controller.rb
+index 87b21f6..a7542dd 100644
+--- a/app/controllers/testdata_controller.rb
++++ b/app/controllers/testdata_controller.rb
+@@ -1,7 +1,7 @@
+ class TestdataController < ApplicationController
+-  before_action :authenticate_admin!
+-  before_action :set_problem, except: [:show]
+-  before_action :set_testdatum, only: [:show, :edit, :update, :destroy]
++  before_action :set_problem
++  before_action :authenticate_problem_editor! # need to have the permission to edit the problem
++  before_action :set_testdatum, only: [:show,:edit,:update, :destroy]
+   before_action :set_testdata, only: [:batch_edit, :batch_update]
+   helper_method :strip_uuid
+ 
+@@ -177,6 +177,14 @@ class TestdataController < ApplicationController
+   end
+ 
+   private
++
++  def authenticate_problem_editor!
++    if cannot? :update, @problem or (action_name == 'destroy' and cannot?(:destroy, Testdatum))
++      flash[:alert] = 'Insufficient User Permissions.'
++      redirect_to root_path
++    end
++  end
++
+   def set_testdatum
+     @testdatum = Testdatum.find(params[:id])
+   end
+@@ -229,7 +237,7 @@ class TestdataController < ApplicationController
+     params
+   end
+ 
+-  # Never trust parameters from the scary internet, only allow the white list through. 
++  # Never trust parameters from the scary internet, only allow the white list through.
+   # and check if the file is a zip file
+   def unzip_testdata(tmp_folder)
+     checked_params = params.require(:testdatum).permit(
+@@ -287,4 +295,4 @@ class TestdataController < ApplicationController
+   def batch_update_params
+     params.permit(td: [:time_limit, :vss_limit, :rss_limit, :output_limit, :position, :form_same_as_above, :form_delete])
+   end
+-end
+\ No newline at end of file
++end
+diff --git a/app/models/ability.rb b/app/models/ability.rb
+new file mode 100644
+index 0000000..642788e
+--- /dev/null
++++ b/app/models/ability.rb
+@@ -0,0 +1,27 @@
++# frozen_string_literal: true
++
++class Ability
++  include CanCan::Ability
++  require 'pry-remote'
++
++  def initialize(user)
++    user ||= User.new(role: 'guest')
++
++    can [:read,:ranklist], Problem, visible_state: "public"
++    if user.role == 'sysadmin'
++      can :manage, :all
++    elsif user.role == 'admin'
++      can :create, Problem
++      can :update, Problem, visible_state: "public"
++      can :read, Testdatum
++    elsif user.role == 'problem_setter'
++      can :create, Problem
++    elsif user.role == 'normal_user'
++    elsif user.role == 'guest'
++    end
++
++    if user&.id
++      can [:read, :show, :edit, :update, :destroy, :ranklist, :ranklist_old, :rejudge], Problem,user_id: user&.id
++    end
++  end
++end
+diff --git a/app/models/old_submission.rb b/app/models/old_submission.rb
+index ec3fb02..9ce53f6 100644
+--- a/app/models/old_submission.rb
++++ b/app/models/old_submission.rb
+@@ -17,7 +17,7 @@
+ #  index_old_submissions_on_problem_id             (problem_id)
+ #  index_old_submissions_on_problem_id_and_result  (problem_id,result)
+ #  index_old_submissions_on_submission_id          (submission_id) UNIQUE
+-#  index_old_submissions_topcoder                  (problem_id,result,score DESC,total_time,total_memory)
++#  index_old_submissions_topcoder                  (problem_id,result,score,total_time,total_memory)
+ #
+ 
+ class OldSubmission < ApplicationRecord
+diff --git a/app/models/problem.rb b/app/models/problem.rb
+index 6889a09..cbe0f35 100644
+--- a/app/models/problem.rb
++++ b/app/models/problem.rb
+@@ -32,18 +32,21 @@
+ #  summary_type           :integer          not null
+ #  summary_code           :text(4294967295)
+ #  summary_compiler_id    :bigint
++#  user_id                :bigint
+ #
+ # Indexes
+ #
+ #  index_problems_on_name                   (name)
+ #  index_problems_on_specjudge_compiler_id  (specjudge_compiler_id)
+ #  index_problems_on_summary_compiler_id    (summary_compiler_id)
++#  index_problems_on_user_id                (user_id)
+ #  index_problems_on_visible_state          (visible_state)
+ #
+ # Foreign Keys
+ #
+ #  fk_rails_...  (specjudge_compiler_id => compilers.id)
+ #  fk_rails_...  (summary_compiler_id => compilers.id)
++#  fk_rails_...  (user_id => users.id)
+ #
+ 
+ class Problem < ApplicationRecord
+@@ -78,6 +81,7 @@ class Problem < ApplicationRecord
+ 
+   belongs_to :specjudge_compiler, class_name: 'Compiler', optional: true
+   belongs_to :summary_compiler, class_name: 'Compiler', optional: true
++  belongs_to :user, class_name: 'UserBase', optional: true, foreign_key: :user_id
+ 
+   validates_length_of :sjcode, maximum: 5000000
+   validates_length_of :interlib, maximum: 5000000
+diff --git a/app/models/submission.rb b/app/models/submission.rb
+index 437e00d..b2a7414 100644
+--- a/app/models/submission.rb
++++ b/app/models/submission.rb
+@@ -21,15 +21,15 @@
+ # Indexes
+ #
+ #  fk_rails_55e5b9f361                         (compiler_id)
+-#  index_submissions_contest_compiler          (contest_id,compiler_id,id DESC)
+-#  index_submissions_contest_result            (contest_id,result,id DESC)
+-#  index_submissions_fetch                     (result,priority DESC,id)
++#  index_submissions_contest_compiler          (contest_id,compiler_id,id)
++#  index_submissions_contest_result            (contest_id,result,id)
++#  index_submissions_fetch                     (result,priority,id)
+ #  index_submissions_on_code_content_id        (code_content_id)
+ #  index_submissions_on_contest_id             (contest_id)
+ #  index_submissions_on_result_and_updated_at  (result,updated_at)
+ #  index_submissions_on_user_id                (user_id)
+ #  index_submissions_problem_query             (contest_id,problem_id,user_id,result)
+-#  index_submissions_topcoder                  (contest_id,problem_id,result,score DESC,total_time,total_memory)
++#  index_submissions_topcoder                  (contest_id,problem_id,result,score,total_time,total_memory)
+ #  index_submissions_user_query                (contest_id,user_id,problem_id,result)
+ #
+ # Foreign Keys
+diff --git a/app/models/user.rb b/app/models/user.rb
+index 97d54cc..84b39b0 100644
+--- a/app/models/user.rb
++++ b/app/models/user.rb
+@@ -27,6 +27,7 @@
+ #  last_compiler_id       :bigint
+ #  type                   :string(255)      default("User"), not null
+ #  contest_id             :bigint
++#  role                   :string(255)
+ #
+ # Indexes
+ #
+@@ -47,7 +48,9 @@ require 'file_size_validator'
+ 
+ class UserBase < ApplicationRecord
+   self.table_name = "users"
++  ROLES = %i[sysadmin admin problem_setter normal_user guest]
+ 
++  has_many :problems, dependent: :destroy, foreign_key: :user_id
+   has_many :submissions, dependent: :destroy, foreign_key: :user_id
+   has_many :posts, dependent: :destroy, foreign_key: :user_id
+   has_many :comments, dependent: :destroy, foreign_key: :user_id
+diff --git a/app/views/layouts/base.erb b/app/views/layouts/base.erb
+index 43c50fa..4524d3e 100644
+--- a/app/views/layouts/base.erb
++++ b/app/views/layouts/base.erb
+@@ -7,7 +7,6 @@
+ <%= javascript_include_tag "application" %>
+ <%= csrf_meta_tags %>
+ <script>MathJax={tex:{inlineMath:[['$','$'],['\\(','\\)']]}};</script>
+-<%= mathjax_tag component: 'tex-svg-full.js' %>
+ <%= yield :icon %>
+ <meta name="viewport" content="width=device-width, initial-scale=1.0">
+ </head>
+diff --git a/app/views/problems/index.html.erb b/app/views/problems/index.html.erb
+index b588cbe..0e198f8 100644
+--- a/app/views/problems/index.html.erb
++++ b/app/views/problems/index.html.erb
+@@ -6,7 +6,7 @@
+   <% end %>
+ </h4>
+ 
+-<% if current_user&.admin? %>
++<% if can? :create, Problem %>
+   <%= link_to 'New Problem', new_problem_path, class: 'btn btn-success btn-sm' %><br>
+ <% end %>
+ 
+@@ -49,7 +49,7 @@ window.onpageshow = function(e){
+       <th class="text-center">TopCoder</th>
+       <th>AC Ratio (user)</th>
+       <th>AC (submission)</th>
+-      <% if current_user&.admin? %>
++      <% if current_user&.role == "sysadmin" %>
+         <th>Visibility</th>
+       <% end %>
+       <% if user_signed_in? %><th></th><% end %>
+@@ -60,7 +60,7 @@ window.onpageshow = function(e){
+     <% problem_a = @problems.to_a %>
+     <% topcoders = topcoders(problem_a) %>
+     <% problem_a.each do |problem| %>
+-      <% if current_user&.admin? or problem.visible_public? %>
++      <% if can? :read ,problem or problem.visible_public? %>
+         <tr>
+           <td><%= user_problem_status_with_infor(problem, @attr_map) if user_signed_in? %></td>
+           <td><%= link_to problem.id, problem_path(problem.id) %></td>
+@@ -78,12 +78,12 @@ window.onpageshow = function(e){
+           </td>
+           <td><%= users_ac_ratio_with_infor(problem, @attr_map) %></td>
+           <td><%= submissions_ac_ratio_with_infor(problem, @attr_map) %></td>
+-          <% if current_user&.admin? %>
++          <% if current_user&.role == 'sysadmin' %>
+             <td><%= problem.visible_state.capitalize %></td>
+           <% end %>
+           <% if user_signed_in? %>
+             <td style="white-space: nowrap;">
+-              <% if current_user.admin? %>
++              <% if can? :edit, problem %>
+                 <%= link_to 'Edit', edit_problem_path(problem), class: 'btn btn-info btn-xs' %>
+               <% end %>
+               <%= link_to 'Submit', new_problem_submission_path(problem), class: 'btn btn-success btn-xs' %>
+diff --git a/app/views/problems/show.html.erb b/app/views/problems/show.html.erb
+index 4c35b7d..2b0a3b8 100644
+--- a/app/views/problems/show.html.erb
++++ b/app/views/problems/show.html.erb
+@@ -25,30 +25,39 @@
+     <%= link_to 'Back to Problems List', @contest.blank? ? problems_path : contest_adaptive_polymorphic_path([]), class: 'btn btn-default btn-xs btn-block' %>
+   </div>
+ </div>
+-<% if effective_admin? %>
++<% can_update = can? :update, @problem%>
++<% can_rejudge = can? :rejudge, @problem%>
++<% can_destroy = can? :destroy, @problem%>
++<% if can_update or can_destroy or can_rejudge %>
+   <div class="row" style="padding-top:10px;">
++    <% if can_update %>
+     <div class="col-md-2">
+       <%= link_to 'Edit', edit_problem_path(@problem), class: 'btn btn-info btn-xs btn-block' %>
+     </div>
+     <div class="col-md-2">
+       <%= link_to 'Manage Testdata', problem_testdata_path(@problem), class: 'btn btn-warning btn-xs btn-block' %>
+     </div>
+-    <div class="col-md-2">
+-      <% if @contest %>
+-        <%= form_with url: rejudge_contest_problem_path(@contest, @problem) do |f| %>
+-          <%= f.submit 'Rejudge in Contest', data: {confirm: "Are you really going to rejudge the whole problem in this contest? Out-of-contest submissions won't be affected."}, class: 'btn btn-inverse btn-xs btn-block' %>
++    <% end %>
++    <% if can_rejudge %>
++      <div class="col-md-2">
++        <% if @contest %>
++          <%= form_with url: rejudge_contest_problem_path(@contest, @problem) do |f| %>
++            <%= f.submit 'Rejudge in Contest', data: {confirm: "Are you really going to rejudge the whole problem in this contest? Out-of-contest submissions won't be affected."}, class: 'btn btn-inverse btn-xs btn-block' %>
++          <% end %>
++        <% else %>
++          <%= form_with url: rejudge_problem_path(@problem) do |f| %>
++            <%= f.submit 'Rejudge', data: {confirm: "Are you really going to rejudge the whole problem? Contest submissions won't be affected."}, class: 'btn btn-inverse btn-xs btn-block' %>
++          <% end %>
+         <% end %>
+-      <% else %>
+-        <%= form_with url: rejudge_problem_path(@problem) do |f| %>
+-          <%= f.submit 'Rejudge', data: {confirm: "Are you really going to rejudge the whole problem? Contest submissions won't be affected."}, class: 'btn btn-inverse btn-xs btn-block' %>
++      </div>
++    <% end %>
++    <% if can_destroy %>
++      <div class="col-md-2">
++        <%= form_with url: delsub_problem_path(@problem) do |f| %>
++          <%= f.submit 'Delete All Submissions', data: {confirm: 'Are you really going to delete ALL submissions to this problem?'}, class: 'btn btn-danger btn-xs btn-block' %>
+         <% end %>
+-      <% end %>
+-    </div>
+-    <div class="col-md-2">
+-      <%= form_with url: delsub_problem_path(@problem) do |f| %>
+-        <%= f.submit 'Delete All Submissions', data: {confirm: 'Are you really going to delete ALL submissions to this problem?'}, class: 'btn btn-danger btn-xs btn-block' %>
+-      <% end %>
+-    </div>
++      </div>
++    <% end %>
+   </div>
+ <% end %>
+ </p>
+diff --git a/app/views/testdata/index.html.erb b/app/views/testdata/index.html.erb
+index 67667a2..c72c1f4 100644
+--- a/app/views/testdata/index.html.erb
++++ b/app/views/testdata/index.html.erb
+@@ -1,8 +1,10 @@
+ <h4 class="page-header">Testdata List <small>Problem #<%= @problem.id%>. <%= @problem.name %></small></h4>
+ 
++<% if can? :update, @problem%>
+ <%= link_to 'New Testdatum', new_problem_testdatum_path, class: 'btn btn-success btn-sm' %>
+ <%= link_to 'Batch Create Testdata', batch_new_problem_testdata_path, class: 'btn btn-success btn-sm'%>
+ <%= link_to 'Batch Edit Testdata', batch_edit_problem_testdata_path, class: 'btn btn-success btn-sm' %>
++<% end %>
+ 
+ <table class="table table-hover table-striped table-condensed">
+   <thead>
+@@ -22,6 +24,8 @@
+ 
+   <tbody >
+   <% if @testdata.present? %>
++    <% can_edit = can? :edit, @problem%>
++    <% can_destroy = can? :destroy, @problem %>
+     <% @testdata.each_with_index do |testdatum, index| %>
+       <tr>
+         <td><%= index %></td>
+@@ -37,10 +41,16 @@
+         <td><%= testdatum.vss_limit || '-' %></td>
+         <td><%= testdatum.rss_limit || '-' %></td>
+         <td><%= testdatum.output_limit %></td>
++        <% if can_edit or can_destroy%>
+         <td>
+-          <%= link_to 'Edit', edit_problem_testdatum_path(@problem, testdatum), class: 'btn btn-info btn-xs' %>
+-          <%= link_to 'Destroy', problem_testdatum_path(@problem, testdatum), method: :delete, data: { confirm: 'Are you sure?' }, class:'btn btn-xs btn-danger' %>
++          <% if can_edit %>
++            <%= link_to 'Edit', edit_problem_testdatum_path(@problem, testdatum), class: 'btn btn-info btn-xs' %>
++          <% end %>
++          <% if can_destroy %>
++            <%= link_to 'Destroy', problem_testdatum_path(@problem, testdatum), method: :delete, data: { confirm: 'Are you sure?' }, class:'btn btn-xs btn-danger' %>
++          <% end %>
+         </td>
++        <% end %>
+       </tr>
+     <% end %>
+   <% end %>
+diff --git a/db/migrate/20240620144102_add_role_to_users.rb b/db/migrate/20240620144102_add_role_to_users.rb
+new file mode 100644
+index 0000000..6c92f4b
+--- /dev/null
++++ b/db/migrate/20240620144102_add_role_to_users.rb
+@@ -0,0 +1,5 @@
++class AddRoleToUsers < ActiveRecord::Migration[7.0]
++  def change
++    add_column :users, :role, :string
++  end
++end
+diff --git a/db/migrate/20240621091944_add_user_id_to_problems.rb b/db/migrate/20240621091944_add_user_id_to_problems.rb
+new file mode 100644
+index 0000000..90a97a9
+--- /dev/null
++++ b/db/migrate/20240621091944_add_user_id_to_problems.rb
+@@ -0,0 +1,5 @@
++class AddUserIdToProblems < ActiveRecord::Migration[7.0]
++  def change
++    add_reference :problems, :user, foreign_key: true
++  end
++end
+diff --git a/db/schema.rb b/db/schema.rb
+index d3f1ad2..d9a07b6 100644
+--- a/db/schema.rb
++++ b/db/schema.rb
+@@ -10,8 +10,8 @@
+ #
+ # It's strongly recommended that you check this file into your version control system.
+ 
+-ActiveRecord::Schema[7.0].define(version: 2024_03_27_010819) do
+-  create_table "active_admin_comments", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
++ActiveRecord::Schema[7.0].define(version: 2024_06_21_091944) do
++  create_table "active_admin_comments", charset: "utf8mb4", collation: "utf8mb4_uca1400_nopad_ai_ci", force: :cascade do |t|
+     t.string "namespace"
+     t.text "body", size: :medium
+     t.string "resource_id", null: false
+@@ -25,7 +25,7 @@ ActiveRecord::Schema[7.0].define(version: 2024_03_27_010819) do
+     t.index ["resource_type", "resource_id"], name: "index_active_admin_comments_on_resource_type_and_resource_id"
+   end
+ 
+-  create_table "active_storage_attachments", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
++  create_table "active_storage_attachments", charset: "utf8mb4", collation: "utf8mb4_uca1400_nopad_ai_ci", force: :cascade do |t|
+     t.string "name", null: false
+     t.string "record_type", null: false
+     t.bigint "record_id", null: false
+@@ -35,7 +35,7 @@ ActiveRecord::Schema[7.0].define(version: 2024_03_27_010819) do
+     t.index ["record_type", "record_id", "name", "blob_id"], name: "index_active_storage_attachments_uniqueness", unique: true
+   end
+ 
+-  create_table "active_storage_blobs", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
++  create_table "active_storage_blobs", charset: "utf8mb4", collation: "utf8mb4_uca1400_nopad_ai_ci", force: :cascade do |t|
+     t.string "key", null: false
+     t.string "filename", null: false
+     t.string "content_type"
+@@ -47,13 +47,13 @@ ActiveRecord::Schema[7.0].define(version: 2024_03_27_010819) do
+     t.index ["key"], name: "index_active_storage_blobs_on_key", unique: true
+   end
+ 
+-  create_table "active_storage_variant_records", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
++  create_table "active_storage_variant_records", charset: "utf8mb4", collation: "utf8mb4_uca1400_nopad_ai_ci", force: :cascade do |t|
+     t.bigint "blob_id", null: false
+     t.string "variation_digest", null: false
+     t.index ["blob_id", "variation_digest"], name: "index_active_storage_variant_records_uniqueness", unique: true
+   end
+ 
+-  create_table "admin_users", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
++  create_table "admin_users", charset: "utf8mb4", collation: "utf8mb4_uca1400_nopad_ai_ci", force: :cascade do |t|
+     t.string "email", default: "", null: false
+     t.string "encrypted_password", default: "", null: false
+     t.string "reset_password_token"
+@@ -72,7 +72,7 @@ ActiveRecord::Schema[7.0].define(version: 2024_03_27_010819) do
+     t.index ["username"], name: "index_admin_users_on_username", unique: true
+   end
+ 
+-  create_table "announcements", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
++  create_table "announcements", charset: "utf8mb4", collation: "utf8mb4_uca1400_nopad_ai_ci", force: :cascade do |t|
+     t.string "title"
+     t.string "body"
+     t.datetime "created_at", null: false
+@@ -81,7 +81,7 @@ ActiveRecord::Schema[7.0].define(version: 2024_03_27_010819) do
+     t.index ["contest_id"], name: "index_announcements_on_contest_id"
+   end
+ 
+-  create_table "articles", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
++  create_table "articles", charset: "utf8mb4", collation: "utf8mb4_uca1400_nopad_ai_ci", force: :cascade do |t|
+     t.string "title"
+     t.text "content", size: :medium
+     t.bigint "user_id"
+@@ -94,7 +94,7 @@ ActiveRecord::Schema[7.0].define(version: 2024_03_27_010819) do
+     t.index ["category", "pinned", "era"], name: "index_articles_on_category_and_pinned_and_era"
+   end
+ 
+-  create_table "attachments", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
++  create_table "attachments", charset: "utf8mb4", collation: "utf8mb4_uca1400_nopad_ai_ci", force: :cascade do |t|
+     t.bigint "article_id"
+     t.string "path"
+     t.datetime "created_at"
+@@ -102,7 +102,7 @@ ActiveRecord::Schema[7.0].define(version: 2024_03_27_010819) do
+     t.index ["article_id"], name: "index_attachments_on_article_id"
+   end
+ 
+-  create_table "ban_compilers", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
++  create_table "ban_compilers", charset: "utf8mb4", collation: "utf8mb4_uca1400_nopad_ai_ci", force: :cascade do |t|
+     t.bigint "compiler_id"
+     t.datetime "created_at", null: false
+     t.datetime "updated_at", null: false
+@@ -113,11 +113,11 @@ ActiveRecord::Schema[7.0].define(version: 2024_03_27_010819) do
+     t.index ["with_compiler_type", "with_compiler_id"], name: "index_ban_compilers_on_with_compiler_type_and_with_compiler_id"
+   end
+ 
+-  create_table "code_contents", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
++  create_table "code_contents", charset: "utf8mb4", collation: "utf8mb4_uca1400_nopad_ai_ci", force: :cascade do |t|
+     t.binary "code", size: :long
+   end
+ 
+-  create_table "comments", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
++  create_table "comments", charset: "utf8mb4", collation: "utf8mb4_uca1400_nopad_ai_ci", force: :cascade do |t|
+     t.string "title"
+     t.text "content", size: :medium
+     t.bigint "user_id"
+@@ -129,7 +129,7 @@ ActiveRecord::Schema[7.0].define(version: 2024_03_27_010819) do
+     t.index ["user_id"], name: "index_comments_on_user_id"
+   end
+ 
+-  create_table "compilers", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
++  create_table "compilers", charset: "utf8mb4", collation: "utf8mb4_uca1400_nopad_ai_ci", force: :cascade do |t|
+     t.string "name"
+     t.string "description"
+     t.string "format_type"
+@@ -140,7 +140,7 @@ ActiveRecord::Schema[7.0].define(version: 2024_03_27_010819) do
+     t.index ["name"], name: "index_compilers_on_name", unique: true
+   end
+ 
+-  create_table "contest_problem_joints", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
++  create_table "contest_problem_joints", charset: "utf8mb4", collation: "utf8mb4_uca1400_nopad_ai_ci", force: :cascade do |t|
+     t.bigint "contest_id"
+     t.bigint "problem_id"
+     t.datetime "created_at"
+@@ -148,7 +148,7 @@ ActiveRecord::Schema[7.0].define(version: 2024_03_27_010819) do
+     t.index ["contest_id", "problem_id"], name: "contest_task_ix", unique: true
+   end
+ 
+-  create_table "contest_registrations", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
++  create_table "contest_registrations", charset: "utf8mb4", collation: "utf8mb4_uca1400_nopad_ai_ci", force: :cascade do |t|
+     t.bigint "user_id", null: false
+     t.bigint "contest_id", null: false
+     t.boolean "approved", null: false
+@@ -159,7 +159,7 @@ ActiveRecord::Schema[7.0].define(version: 2024_03_27_010819) do
+     t.index ["user_id", "approved"], name: "index_contest_registrations_on_user_id_and_approved"
+   end
+ 
+-  create_table "contests", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
++  create_table "contests", charset: "utf8mb4", collation: "utf8mb4_uca1400_nopad_ai_ci", force: :cascade do |t|
+     t.string "title"
+     t.text "description", size: :medium
+     t.datetime "start_time"
+@@ -181,7 +181,7 @@ ActiveRecord::Schema[7.0].define(version: 2024_03_27_010819) do
+     t.index ["start_time", "end_time"], name: "index_contests_on_start_time_and_end_time"
+   end
+ 
+-  create_table "judge_servers", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
++  create_table "judge_servers", charset: "utf8mb4", collation: "utf8mb4_uca1400_nopad_ai_ci", force: :cascade do |t|
+     t.string "name"
+     t.string "ip"
+     t.string "key"
+@@ -190,7 +190,7 @@ ActiveRecord::Schema[7.0].define(version: 2024_03_27_010819) do
+     t.boolean "online", default: false
+   end
+ 
+-  create_table "old_submission_testdata_results", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
++  create_table "old_submission_testdata_results", charset: "utf8mb4", collation: "utf8mb4_uca1400_nopad_ai_ci", force: :cascade do |t|
+     t.bigint "old_submission_id"
+     t.integer "position"
+     t.string "result"
+@@ -202,7 +202,7 @@ ActiveRecord::Schema[7.0].define(version: 2024_03_27_010819) do
+     t.index ["old_submission_id"], name: "index_old_submission_testdata_results_on_old_submission_id"
+   end
+ 
+-  create_table "old_submissions", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
++  create_table "old_submissions", charset: "utf8mb4", collation: "utf8mb4_uca1400_nopad_ai_ci", force: :cascade do |t|
+     t.bigint "submission_id"
+     t.bigint "problem_id"
+     t.string "result"
+@@ -211,13 +211,13 @@ ActiveRecord::Schema[7.0].define(version: 2024_03_27_010819) do
+     t.integer "total_memory"
+     t.datetime "created_at", null: false
+     t.datetime "updated_at", null: false
+-    t.index ["problem_id", "result", "score", "total_time", "total_memory"], name: "index_old_submissions_topcoder", order: { score: :desc }
++    t.index ["problem_id", "result", "score", "total_time", "total_memory"], name: "index_old_submissions_topcoder"
+     t.index ["problem_id", "result"], name: "index_old_submissions_on_problem_id_and_result"
+     t.index ["problem_id"], name: "index_old_submissions_on_problem_id"
+     t.index ["submission_id"], name: "index_old_submissions_on_submission_id", unique: true
+   end
+ 
+-  create_table "posts", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
++  create_table "posts", charset: "utf8mb4", collation: "utf8mb4_uca1400_nopad_ai_ci", force: :cascade do |t|
+     t.string "title"
+     t.text "content", size: :medium
+     t.bigint "user_id"
+@@ -235,7 +235,7 @@ ActiveRecord::Schema[7.0].define(version: 2024_03_27_010819) do
+     t.index ["user_id"], name: "index_posts_on_user_id"
+   end
+ 
+-  create_table "problems", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
++  create_table "problems", charset: "utf8mb4", collation: "utf8mb4_uca1400_nopad_ai_ci", force: :cascade do |t|
+     t.string "name"
+     t.text "description", size: :medium
+     t.text "source", size: :medium
+@@ -265,13 +265,15 @@ ActiveRecord::Schema[7.0].define(version: 2024_03_27_010819) do
+     t.integer "summary_type", null: false
+     t.text "summary_code", size: :long
+     t.bigint "summary_compiler_id"
++    t.bigint "user_id"
+     t.index ["name"], name: "index_problems_on_name"
+     t.index ["specjudge_compiler_id"], name: "index_problems_on_specjudge_compiler_id"
+     t.index ["summary_compiler_id"], name: "index_problems_on_summary_compiler_id"
++    t.index ["user_id"], name: "index_problems_on_user_id"
+     t.index ["visible_state"], name: "index_problems_on_visible_state"
+   end
+ 
+-  create_table "sample_testdata", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
++  create_table "sample_testdata", charset: "utf8mb4", collation: "utf8mb4_uca1400_nopad_ai_ci", force: :cascade do |t|
+     t.bigint "problem_id"
+     t.text "input", size: :medium
+     t.text "output", size: :medium
+@@ -280,7 +282,7 @@ ActiveRecord::Schema[7.0].define(version: 2024_03_27_010819) do
+     t.index ["problem_id"], name: "index_sample_testdata_on_problem_id"
+   end
+ 
+-  create_table "sessions", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
++  create_table "sessions", charset: "utf8mb4", collation: "utf8mb4_uca1400_nopad_ai_ci", force: :cascade do |t|
+     t.string "session_id", null: false
+     t.text "data", size: :medium
+     t.datetime "created_at", null: false
+@@ -289,7 +291,7 @@ ActiveRecord::Schema[7.0].define(version: 2024_03_27_010819) do
+     t.index ["updated_at"], name: "index_sessions_on_updated_at"
+   end
+ 
+-  create_table "submission_subtask_results", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
++  create_table "submission_subtask_results", charset: "utf8mb4", collation: "utf8mb4_uca1400_nopad_ai_ci", force: :cascade do |t|
+     t.bigint "submission_id", null: false
+     t.binary "result", size: :medium
+     t.datetime "created_at", null: false
+@@ -297,7 +299,7 @@ ActiveRecord::Schema[7.0].define(version: 2024_03_27_010819) do
+     t.index ["submission_id"], name: "index_submission_subtask_results_on_submission_id", unique: true
+   end
+ 
+-  create_table "submission_testdata_results", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
++  create_table "submission_testdata_results", charset: "utf8mb4", collation: "utf8mb4_uca1400_nopad_ai_ci", force: :cascade do |t|
+     t.bigint "submission_id"
+     t.integer "position"
+     t.string "result"
+@@ -313,7 +315,7 @@ ActiveRecord::Schema[7.0].define(version: 2024_03_27_010819) do
+     t.index ["submission_id"], name: "index_submission_testdata_results_on_submission_id"
+   end
+ 
+-  create_table "submissions", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
++  create_table "submissions", charset: "utf8mb4", collation: "utf8mb4_uca1400_nopad_ai_ci", force: :cascade do |t|
+     t.string "result", default: "queued"
+     t.decimal "score", precision: 18, scale: 6, default: "0.0"
+     t.datetime "created_at"
+@@ -330,18 +332,18 @@ ActiveRecord::Schema[7.0].define(version: 2024_03_27_010819) do
+     t.integer "priority", default: 20, null: false
+     t.index ["code_content_id"], name: "index_submissions_on_code_content_id"
+     t.index ["compiler_id"], name: "fk_rails_55e5b9f361"
+-    t.index ["contest_id", "compiler_id", "id"], name: "index_submissions_contest_compiler", order: { id: :desc }
+-    t.index ["contest_id", "problem_id", "result", "score", "total_time", "total_memory"], name: "index_submissions_topcoder", order: { score: :desc }
++    t.index ["contest_id", "compiler_id", "id"], name: "index_submissions_contest_compiler"
++    t.index ["contest_id", "problem_id", "result", "score", "total_time", "total_memory"], name: "index_submissions_topcoder"
+     t.index ["contest_id", "problem_id", "user_id", "result"], name: "index_submissions_problem_query"
+-    t.index ["contest_id", "result", "id"], name: "index_submissions_contest_result", order: { id: :desc }
++    t.index ["contest_id", "result", "id"], name: "index_submissions_contest_result"
+     t.index ["contest_id", "user_id", "problem_id", "result"], name: "index_submissions_user_query"
+     t.index ["contest_id"], name: "index_submissions_on_contest_id"
+-    t.index ["result", "priority", "id"], name: "index_submissions_fetch", order: { priority: :desc }
++    t.index ["result", "priority", "id"], name: "index_submissions_fetch"
+     t.index ["result", "updated_at"], name: "index_submissions_on_result_and_updated_at"
+     t.index ["user_id"], name: "index_submissions_on_user_id"
+   end
+ 
+-  create_table "subtasks", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
++  create_table "subtasks", charset: "utf8mb4", collation: "utf8mb4_uca1400_nopad_ai_ci", force: :cascade do |t|
+     t.bigint "problem_id"
+     t.decimal "score", precision: 18, scale: 6
+     t.datetime "created_at"
+@@ -351,7 +353,7 @@ ActiveRecord::Schema[7.0].define(version: 2024_03_27_010819) do
+     t.index ["problem_id"], name: "index_subtasks_on_problem_id"
+   end
+ 
+-  create_table "taggings", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
++  create_table "taggings", charset: "utf8mb4", collation: "utf8mb4_uca1400_nopad_ai_ci", force: :cascade do |t|
+     t.bigint "tag_id"
+     t.bigint "taggable_id"
+     t.string "taggable_type"
+@@ -370,13 +372,13 @@ ActiveRecord::Schema[7.0].define(version: 2024_03_27_010819) do
+     t.index ["tagger_id"], name: "index_taggings_on_tagger_id"
+   end
+ 
+-  create_table "tags", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
++  create_table "tags", charset: "utf8mb4", collation: "utf8mb4_uca1400_nopad_ai_ci", force: :cascade do |t|
+     t.string "name"
+     t.integer "taggings_count", default: 0
+     t.index ["name"], name: "index_tags_on_name", unique: true
+   end
+ 
+-  create_table "testdata", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
++  create_table "testdata", charset: "utf8mb4", collation: "utf8mb4_uca1400_nopad_ai_ci", force: :cascade do |t|
+     t.bigint "problem_id"
+     t.string "test_input"
+     t.string "test_output"
+@@ -391,7 +393,7 @@ ActiveRecord::Schema[7.0].define(version: 2024_03_27_010819) do
+     t.boolean "output_compressed", default: false
+   end
+ 
+-  create_table "users", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
++  create_table "users", charset: "utf8mb4", collation: "utf8mb4_uca1400_nopad_ai_ci", force: :cascade do |t|
+     t.string "email"
+     t.string "encrypted_password", default: "", null: false
+     t.string "reset_password_token"
+@@ -416,6 +418,7 @@ ActiveRecord::Schema[7.0].define(version: 2024_03_27_010819) do
+     t.bigint "last_compiler_id"
+     t.string "type", default: "User", null: false
+     t.bigint "contest_id"
++    t.string "role"
+     t.index ["contest_id"], name: "index_users_on_contest_id"
+     t.index ["last_compiler_id"], name: "index_users_on_last_compiler_id"
+     t.index ["type", "contest_id", "email"], name: "index_users_on_type_and_contest_id_and_email", unique: true
+@@ -430,6 +433,7 @@ ActiveRecord::Schema[7.0].define(version: 2024_03_27_010819) do
+   add_foreign_key "ban_compilers", "compilers"
+   add_foreign_key "problems", "compilers", column: "specjudge_compiler_id"
+   add_foreign_key "problems", "compilers", column: "summary_compiler_id"
++  add_foreign_key "problems", "users"
+   add_foreign_key "submission_subtask_results", "submissions"
+   add_foreign_key "submissions", "code_contents"
+   add_foreign_key "submissions", "compilers"
+diff --git a/test/controllers/announcements_controller_test.rb b/test/controllers/announcements_controller_test.rb
+index aff324a..8ed1707 100644
+--- a/test/controllers/announcements_controller_test.rb
++++ b/test/controllers/announcements_controller_test.rb
+@@ -6,13 +6,13 @@ class AnnouncementsControllerTest < ActionDispatch::IntegrationTest
+   end
+ 
+   test "should get index" do
+-    sign_in users(:adminOne)
++    sign_in users(:sysadminOne)
+     get announcements_url
+     assert_response :success
+   end
+ 
+   test "should create announcement" do
+-    sign_in users(:adminOne)
++    sign_in users(:sysadminOne)
+     assert_difference("Announcement.count") do
+       post announcements_url, params: { announcement: { body: @announcement.body, title: @announcement.title } }
+     end
+@@ -21,19 +21,19 @@ class AnnouncementsControllerTest < ActionDispatch::IntegrationTest
+   end
+ 
+   test "should get edit" do
+-    sign_in users(:adminOne)
++    sign_in users(:sysadminOne)
+     get edit_announcement_url(@announcement)
+     assert_response :success
+   end
+ 
+   test "should update announcement" do
+-    sign_in users(:adminOne)
++    sign_in users(:sysadminOne)
+     patch announcement_url(@announcement), params: { announcement: { body: @announcement.body, title: @announcement.title } }
+     assert_redirected_to announcements_url
+   end
+ 
+   test "should destroy announcement" do
+-    sign_in users(:adminOne)
++    sign_in users(:sysadminOne)
+     assert_difference("Announcement.count", -1) do
+       delete announcement_url(@announcement)
+     end
+diff --git a/test/controllers/contest_registrations_controller_test.rb b/test/controllers/contest_registrations_controller_test.rb
+index 0641da9..dfcf10b 100644
+--- a/test/controllers/contest_registrations_controller_test.rb
++++ b/test/controllers/contest_registrations_controller_test.rb
+@@ -13,19 +13,19 @@ class ContestRegistrationsControllerTest < ActionDispatch::IntegrationTest
+   end
+ 
+   test "should get index" do
+-    sign_in users(:adminOne)
++    sign_in users(:sysadminOne)
+     get contest_contest_registrations_url(@contest)
+     assert_response :success
+   end
+ 
+   test "should get new" do
+-    sign_in users(:adminOne)
++    sign_in users(:sysadminOne)
+     get batch_new_contest_contest_registrations_url(@contest)
+     assert_response :success
+   end
+ 
+   test "batch create and delete contest users" do
+-    sign_in users(:adminOne)
++    sign_in users(:sysadminOne)
+     assert_difference("ContestUser.count", 3) do
+       post batch_new_contest_contest_registrations_url(@contest), params: @batch_new_params
+     end
+diff --git a/test/controllers/problems_controller_test.rb b/test/controllers/problems_controller_test.rb
+index 44e7c70..075e014 100644
+--- a/test/controllers/problems_controller_test.rb
++++ b/test/controllers/problems_controller_test.rb
+@@ -1,9 +1,12 @@
+ require "test_helper"
+-
++require "pry-remote"
+ class ProblemsControllerTest < ActionDispatch::IntegrationTest
+   setup do
+     @problem = problems(:one)
+     @problem_invisible = problems(:invisible)
++
++    @problemSetterOne = problems(:problemSetterOne)
++    @problemSetterInvisible = problems(:problemSetterInvisible)
+   end
+ 
+   test "should get index" do
+@@ -27,7 +30,7 @@ class ProblemsControllerTest < ActionDispatch::IntegrationTest
+     end
+     sign_out :user
+ 
+-    sign_in users(:adminOne)
++    sign_in users(:sysadminOne)
+     get problem_url(@problem_invisible)
+     assert_response :success
+   end
+@@ -38,7 +41,7 @@ class ProblemsControllerTest < ActionDispatch::IntegrationTest
+   end
+ 
+   test "should create problem" do
+-    sign_in users(:adminOne)
++    sign_in users(:sysadminOne)
+     assert_difference("Problem.count") do
+       post problems_url, params: {problem: @problem.attributes.except('id')}
+     end
+@@ -47,20 +50,20 @@ class ProblemsControllerTest < ActionDispatch::IntegrationTest
+   end
+ 
+   test "should get edit" do
+-    sign_in users(:adminOne)
++    sign_in users(:sysadminOne)
+     get edit_problem_url(@problem)
+     assert_response :success
+   end
+ 
+   test "should update problem" do
+-    sign_in users(:adminOne)
++    sign_in users(:sysadminOne)
+     patch problem_url(@problem), params: { problem: { name: @problem.name } }
+     assert_response :redirect
+     assert_match /\/problems\/[0-9]+/, @response.redirect_url
+   end
+ 
+   test "should not destroy problem" do
+-    sign_in users(:adminOne)
++    sign_in users(:sysadminOne)
+     assert_difference("Problem.count", 0) do
+       delete problem_url(@problem)
+     end
+@@ -75,4 +78,27 @@ class ProblemsControllerTest < ActionDispatch::IntegrationTest
+     patch problem_url(@problem), params: { problem: { name: @problem.name } }
+     assert_no_permission
+   end
++
++  test "problem setter should create problem" do
++    sign_in users(:problem_setterOne)
++    assert_difference("Problem.count") do
++      post problems_url, params: {problem: @problem.attributes.except('id')}
++    end
++    assert_response :redirect
++    assert_match /\/problems\/[0-9]+/, @response.redirect_url
++  end
++
++  test "problem setter can edit their own problem" do
++    sign_in users(:problem_setterOne)
++    get edit_problem_url(@problemSetterOne)
++    #binding.remote_pry
++    assert_response :success
++  end
++
++  test "problem setter can not edit other's problem" do
++    sign_in users(:problem_setterOne)
++    get edit_problem_url(@problem)
++    assert_no_permission
++    get edit_problem_url(@problem_invisible)
++  end
+ end
+diff --git a/test/controllers/submissions_controller_test.rb b/test/controllers/submissions_controller_test.rb
+index f909591..f1d1b57 100644
+--- a/test/controllers/submissions_controller_test.rb
++++ b/test/controllers/submissions_controller_test.rb
+@@ -34,7 +34,7 @@ class SubmissionsControllerTest < ActionDispatch::IntegrationTest
+     end
+     sign_out :user
+ 
+-    sign_in users(:adminOne)
++    sign_in users(:sysadminOne)
+     get submission_url(@submission_invisible)
+     assert_response :success
+   end
+@@ -58,13 +58,13 @@ class SubmissionsControllerTest < ActionDispatch::IntegrationTest
+   end
+ 
+   test "should get edit" do
+-    sign_in users(:adminOne)
++    sign_in users(:sysadminOne)
+     get edit_submission_url(@submission)
+     assert_response :success
+   end
+ 
+   test "should update submission" do
+-    sign_in users(:adminOne)
++    sign_in users(:sysadminOne)
+     code = "anothercode"
+     patch submission_url(@submission), params: {submission: {
+       compiler_id: compilers(:c99).id,
+@@ -78,7 +78,7 @@ class SubmissionsControllerTest < ActionDispatch::IntegrationTest
+   end
+ 
+   test "should destroy submission" do
+-    sign_in users(:adminOne)
++    sign_in users(:sysadminOne)
+     assert_difference("Submission.count", -1) do
+       delete submission_url(@submission)
+     end
+diff --git a/test/fixtures/problems.yml b/test/fixtures/problems.yml
+index d7ec10e..c5ddf9c 100644
+--- a/test/fixtures/problems.yml
++++ b/test/fixtures/problems.yml
+@@ -32,18 +32,21 @@
+ #  summary_type           :integer          not null
+ #  summary_code           :text(4294967295)
+ #  summary_compiler_id    :bigint
++#  user_id                :bigint
+ #
+ # Indexes
+ #
+ #  index_problems_on_name                   (name)
+ #  index_problems_on_specjudge_compiler_id  (specjudge_compiler_id)
+ #  index_problems_on_summary_compiler_id    (summary_compiler_id)
++#  index_problems_on_user_id                (user_id)
+ #  index_problems_on_visible_state          (visible_state)
+ #
+ # Foreign Keys
+ #
+ #  fk_rails_...  (specjudge_compiler_id => compilers.id)
+ #  fk_rails_...  (summary_compiler_id => compilers.id)
++#  fk_rails_...  (user_id => users.id)
+ #
+ 
+ one:
+@@ -57,6 +60,7 @@ one:
+   specjudge_type: none
+   interlib_type: none
+   visible_state: public
++  summary_type: 'none'
+ 
+ invisible:
+   name: ProblemInvisible
+@@ -69,3 +73,32 @@ invisible:
+   specjudge_type: none
+   interlib_type: none
+   visible_state: invisible
++  summary_type: 'none'
++
++problemSetterOne:
++  name: ProblemSetterOne
++  description: String1-1
++  input: String1-2
++  output: String1-3
++  hint: String1-4
++  source: String1-5
++  verdict_ignore_td_list: ""
++  specjudge_type: none
++  interlib_type: none
++  visible_state: public
++  summary_type: 'none'
++  user_id: 123
++
++problemSetterInvisible:
++  name: ProblemSetterInvible
++  description: String1-1
++  input: String1-2
++  output: String1-3
++  hint: String1-4
++  source: String1-5
++  verdict_ignore_td_list: ""
++  specjudge_type: none
++  interlib_type: none
++  visible_state: invisible
++  summary_type: 'none'
++  user_id: 123
+\ No newline at end of file
+diff --git a/test/fixtures/submissions.yml b/test/fixtures/submissions.yml
+index f2a3e3e..6d7b235 100644
+--- a/test/fixtures/submissions.yml
++++ b/test/fixtures/submissions.yml
+@@ -21,15 +21,15 @@
+ # Indexes
+ #
+ #  fk_rails_55e5b9f361                         (compiler_id)
+-#  index_submissions_contest_compiler          (contest_id,compiler_id,id DESC)
+-#  index_submissions_contest_result            (contest_id,result,id DESC)
+-#  index_submissions_fetch                     (result,priority DESC,id)
++#  index_submissions_contest_compiler          (contest_id,compiler_id,id)
++#  index_submissions_contest_result            (contest_id,result,id)
++#  index_submissions_fetch                     (result,priority,id)
+ #  index_submissions_on_code_content_id        (code_content_id)
+ #  index_submissions_on_contest_id             (contest_id)
+ #  index_submissions_on_result_and_updated_at  (result,updated_at)
+ #  index_submissions_on_user_id                (user_id)
+ #  index_submissions_problem_query             (contest_id,problem_id,user_id,result)
+-#  index_submissions_topcoder                  (contest_id,problem_id,result,score DESC,total_time,total_memory)
++#  index_submissions_topcoder                  (contest_id,problem_id,result,score,total_time,total_memory)
+ #  index_submissions_user_query                (contest_id,user_id,problem_id,result)
+ #
+ # Foreign Keys
+@@ -51,7 +51,7 @@ ac:
+ 
+ invisible:
+   problem: invisible
+-  user: adminOne
++  user: sysadminOne
+   total_time: 0
+   total_memory: 0
+   result: AC
+diff --git a/test/fixtures/users.yml b/test/fixtures/users.yml
+index f497990..e8d45a8 100644
+--- a/test/fixtures/users.yml
++++ b/test/fixtures/users.yml
+@@ -27,6 +27,7 @@
+ #  last_compiler_id       :bigint
+ #  type                   :string(255)      default("User"), not null
+ #  contest_id             :bigint
++#  role                   :string(255)
+ #
+ # Indexes
+ #
+@@ -52,6 +53,18 @@ userOne:
+   school: userOneSchool
+   gradyear: 123
+   admin: false
++  role: 'normaluser'
++
++sysadminOne:
++  email: sysadminOne@example.org
++  encrypted_password: <%= User.new.send(:password_digest, 'sysadminOne') %>
++  username: sysadminOne
++  name: sysadminOneName
++  nickname: sysadminOneNck
++  school: sysadminOneSchool
++  gradyear: 123
++  admin: true
++  role: 'sysadmin'
+ 
+ adminOne:
+   email: adminOne@example.org
+@@ -61,4 +74,39 @@ adminOne:
+   nickname: adminOneNck
+   school: adminOneSchool
+   gradyear: 123
+-  admin: true
++  admin: false
++  role: 'admin'
++
++normal_userOne:
++  email: normal_userOne@example.org
++  encrypted_password: <%= User.new.send(:password_digest, 'normal_userOne') %>
++  username: normal_userOne
++  name: normal_userOneName
++  nickname: normal_userOneNck
++  school: normal_userOneSchool
++  gradyear: 123
++  admin: false
++  role: 'normal_user'
++
++problem_setterOne:
++  email: problem_setterOne@example.org
++  encrypted_password: <%= User.new.send(:password_digest, 'problem_setterOne') %>
++  username: problem_setterOne
++  name: problem_setterOneName
++  nickname: problem_setterOneNck
++  school: problem_setterOneSchool
++  gradyear: 123
++  admin: false
++  role: 'problem_setter'
++  id: 123
++
++guestOne:
++  email: guestOne@example.org
++  encrypted_password: <%= User.new.send(:password_digest, 'guestOne') %>
++  username: guestOne
++  name: guestOneName
++  nickname: guestOneNck
++  school: guestOneSchool
++  gradyear: 123
++  admin: false
++  role: 'guest'
+\ No newline at end of file
+diff --git a/test/models/ability_test.rb b/test/models/ability_test.rb
+new file mode 100644
+index 0000000..c3420c0
+--- /dev/null
++++ b/test/models/ability_test.rb
+@@ -0,0 +1,111 @@
++# test/models/ability_test.rb
++require 'test_helper'
++
++class AbilityTest < ActiveSupport::TestCase
++  def setup
++    @user_one = users(:userOne)
++    @sysadmin_one = users(:sysadminOne)
++    @admin_one = users(:adminOne)
++    @normal_user_one = users(:normal_userOne)
++    @problem_setter_one = users(:problem_setterOne)
++    @guest_one = users(:guestOne)
++  end
++
++  test "userOne should be able to read and ranklist public problems" do
++    ability = Ability.new(@user_one)
++    assert ability.can?(:read, Problem.new(visible_state: 'public'))
++    assert ability.can?(:ranklist, Problem.new(visible_state: 'public'))
++  end
++
++  test "sysadminOne should be able to manage all" do
++    ability = Ability.new(@sysadmin_one)
++    assert ability.can?(:manage, :all)
++  end
++
++  test "adminOne should be able to create and update public problems, read testdata" do
++    ability = Ability.new(@admin_one)
++    assert ability.can?(:create, Problem)
++    assert ability.can?(:update, Problem.new(visible_state: 'public'))
++    assert ability.can?(:read, Testdatum)
++  end
++
++  test "problem_setterOne should be able to create problems" do
++    ability = Ability.new(@problem_setter_one)
++    assert ability.can?(:create, Problem)
++  end
++
++  test "normal_userOne should have no special permissions" do
++    ability = Ability.new(@normal_user_one)
++    assert ability.cannot?(:create, Problem)
++  end
++
++  test "guestOne should have no special permissions" do
++    ability = Ability.new(@guest_one)
++    assert ability.cannot?(:create, Problem)
++  end
++
++  test "user should manage own problems" do
++    problem = Problem.new(user_id: @user_one.id)
++    ability = Ability.new(@user_one)
++    assert ability.can?(:read, problem)
++    assert ability.can?(:destroy, problem)
++    assert ability.can?(:rejudge, problem)
++    assert ability.can?(:update, problem)
++  end
++
++  test "user shouldn't manage other's problems" do
++    problem = Problem.new(user_id: @user_one.id + 1)
++    ability = Ability.new(@user_one)
++    assert ability.cannot?(:create, Problem)
++    assert ability.cannot?(:read, problem)
++    assert ability.cannot?(:destroy, problem)
++    assert ability.cannot?(:rejudge, problem)
++    assert ability.cannot?(:update, problem)
++  end
++
++  test "sysadmin can create problem" do
++    ability = Ability.new(@sysadmin_one)
++    assert ability.can?(:create, Problem)
++  end
++
++  test "admin can create problem" do
++    ability = Ability.new(@admin_one)
++    assert ability.can?(:create, Problem)
++  end
++
++  test "problem setter can create problem" do
++    ability = Ability.new(@problem_setter_one)
++    assert ability.can?(:create, Problem)
++  end
++
++  test "normal user can't do anything except read and ranklist public problems" do
++    ability = Ability.new(@normal_user_one)
++    problem = Problem.new(user_id: @normal_user_one.id + 1, visible_state: 'public')
++    assert ability.cannot?(:create, Problem)
++    assert ability.cannot?(:destroy, problem)
++    assert ability.cannot?(:update, problem)
++    assert ability.cannot?(:rejudge, problem)
++    assert ability.cannot?(:ranklist_old, problem)
++    assert ability.can?(:read, problem)
++    assert ability.can?(:ranklist, problem)
++  end
++
++  test "normal user can't do anything on private problems" do
++    ability = Ability.new(@normal_user_one)
++    problem = Problem.new(user_id: @normal_user_one.id + 1, visible_state: 'invisible')
++    assert ability.cannot?(:create, Problem)
++    assert ability.cannot?(:destroy, problem)
++    assert ability.cannot?(:update, problem)
++    assert ability.cannot?(:rejudge, problem)
++    assert ability.cannot?(:ranklist_old, problem)
++    assert ability.cannot?(:read, problem)
++    assert ability.cannot?(:ranklist, problem)
++  end
++
++
++
++  test "guest can't create problem"  do
++    ability = Ability.new(@guest_one)
++    assert ability.cannot?(:create, Problem)
++  end
++end
+diff --git a/test/models/submission_test.rb b/test/models/submission_test.rb
+index 5270e7d..3264fdd 100644
+--- a/test/models/submission_test.rb
++++ b/test/models/submission_test.rb
+@@ -21,15 +21,15 @@
+ # Indexes
+ #
+ #  fk_rails_55e5b9f361                         (compiler_id)
+-#  index_submissions_contest_compiler          (contest_id,compiler_id,id DESC)
+-#  index_submissions_contest_result            (contest_id,result,id DESC)
+-#  index_submissions_fetch                     (result,priority DESC,id)
++#  index_submissions_contest_compiler          (contest_id,compiler_id,id)
++#  index_submissions_contest_result            (contest_id,result,id)
++#  index_submissions_fetch                     (result,priority,id)
+ #  index_submissions_on_code_content_id        (code_content_id)
+ #  index_submissions_on_contest_id             (contest_id)
+ #  index_submissions_on_result_and_updated_at  (result,updated_at)
+ #  index_submissions_on_user_id                (user_id)
+ #  index_submissions_problem_query             (contest_id,problem_id,user_id,result)
+-#  index_submissions_topcoder                  (contest_id,problem_id,result,score DESC,total_time,total_memory)
++#  index_submissions_topcoder                  (contest_id,problem_id,result,score,total_time,total_memory)
+ #  index_submissions_user_query                (contest_id,user_id,problem_id,result)
+ #
+ # Foreign Keys
+diff --git a/test/system/announcements_test.rb b/test/system/announcements_test.rb
+index a1d0547..d18ae21 100644
+--- a/test/system/announcements_test.rb
++++ b/test/system/announcements_test.rb
+@@ -6,14 +6,14 @@ class AnnouncementsTest < ApplicationSystemTestCase
+   end
+ 
+   test "visiting the index" do
+-    sign_in users(:adminOne)
++    sign_in users(:sysadminOne)
+     visit announcements_url
+     assert_selector "h4", text: "Announcements"
+     assert_selector "h4", text: "New Announcement"
+   end
+ 
+   test "should create announcement" do
+-    sign_in users(:adminOne)
++    sign_in users(:sysadminOne)
+     visit announcements_url
+ 
+     fill_in "Body", with: @announcement.body
+@@ -25,7 +25,7 @@ class AnnouncementsTest < ApplicationSystemTestCase
+   end
+ 
+   test "should update Announcement" do
+-    sign_in users(:adminOne)
++    sign_in users(:sysadminOne)
+     visit announcements_url
+     click_on "Edit", match: :first
+ 
+@@ -37,7 +37,7 @@ class AnnouncementsTest < ApplicationSystemTestCase
+   end
+ 
+   test "should destroy Announcement" do
+-    sign_in users(:adminOne)
++    sign_in users(:sysadminOne)
+     visit announcements_url
+ 
+     accept_alert do
+diff --git a/test/system/contest_registrations_test.rb b/test/system/contest_registrations_test.rb
+index 37eb0dd..0e1f22a 100644
+--- a/test/system/contest_registrations_test.rb
++++ b/test/system/contest_registrations_test.rb
+@@ -6,7 +6,7 @@ class ContestRegistrationsTest < ApplicationSystemTestCase
+   end
+ 
+   test "visiting the index" do
+-    sign_in users(:adminOne)
++    sign_in users(:sysadminOne)
+     visit contest_contest_registrations_url(@contest)
+     assert_selector "h4", text: "Contest users"
+   end

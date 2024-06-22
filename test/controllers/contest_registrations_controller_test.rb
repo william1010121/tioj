@@ -13,19 +13,19 @@ class ContestRegistrationsControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "should get index" do
-    sign_in users(:adminOne)
+    sign_in users(:sysadminOne)
     get contest_contest_registrations_url(@contest)
     assert_response :success
   end
 
   test "should get new" do
-    sign_in users(:adminOne)
+    sign_in users(:sysadminOne)
     get batch_new_contest_contest_registrations_url(@contest)
     assert_response :success
   end
 
   test "batch create and delete contest users" do
-    sign_in users(:adminOne)
+    sign_in users(:sysadminOne)
     assert_difference("ContestUser.count", 3) do
       post batch_new_contest_contest_registrations_url(@contest), params: @batch_new_params
     end

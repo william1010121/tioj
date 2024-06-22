@@ -1,7 +1,7 @@
 class TestdataController < ApplicationController
-  before_action :authenticate_admin!
-  before_action :set_problem, except: [:show]
-  before_action :set_testdatum, only: [:show, :edit, :update, :destroy]
+  before_action :set_problem
+  before_action :authenticate_problem_editor! # need to have the permission to edit the problem
+  before_action :set_testdatum, only: [:show,:edit,:update, :destroy]
   before_action :set_testdata, only: [:batch_edit, :batch_update]
   helper_method :strip_uuid
 
@@ -177,6 +177,14 @@ class TestdataController < ApplicationController
   end
 
   private
+
+  def authenticate_problem_editor!
+    if cannot? :update, @problem or (action_name == 'destroy' and cannot?(:destroy, Testdatum))
+      flash[:alert] = 'Insufficient User Permissions.'
+      redirect_to root_path
+    end
+  end
+
   def set_testdatum
     @testdatum = Testdatum.find(params[:id])
   end
@@ -229,7 +237,7 @@ class TestdataController < ApplicationController
     params
   end
 
-  # Never trust parameters from the scary internet, only allow the white list through. 
+  # Never trust parameters from the scary internet, only allow the white list through.
   # and check if the file is a zip file
   def unzip_testdata(tmp_folder)
     checked_params = params.require(:testdatum).permit(

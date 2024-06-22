@@ -6,7 +6,7 @@ class ContestRegistrationsTest < ApplicationSystemTestCase
   end
 
   test "visiting the index" do
-    sign_in users(:adminOne)
+    sign_in users(:sysadminOne)
     visit contest_contest_registrations_url(@contest)
     assert_selector "h4", text: "Contest users"
   end

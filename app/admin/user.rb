@@ -1,5 +1,5 @@
 ActiveAdmin.register User do
-  permit_params :email, :nickname, :admin, :avatar_url, :motto, :school, :gradyear, :name
+  permit_params :email, :nickname, :admin, :avatar_url, :motto, :school, :gradyear, :name, :role
 
   index do
     selectable_column

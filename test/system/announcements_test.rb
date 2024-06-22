@@ -6,14 +6,14 @@ class AnnouncementsTest < ApplicationSystemTestCase
   end
 
   test "visiting the index" do
-    sign_in users(:adminOne)
+    sign_in users(:sysadminOne)
     visit announcements_url
     assert_selector "h4", text: "Announcements"
     assert_selector "h4", text: "New Announcement"
   end
 
   test "should create announcement" do
-    sign_in users(:adminOne)
+    sign_in users(:sysadminOne)
     visit announcements_url
 
     fill_in "Body", with: @announcement.body
@@ -25,7 +25,7 @@ class AnnouncementsTest < ApplicationSystemTestCase
   end
 
   test "should update Announcement" do
-    sign_in users(:adminOne)
+    sign_in users(:sysadminOne)
     visit announcements_url
     click_on "Edit", match: :first
 
@@ -37,7 +37,7 @@ class AnnouncementsTest < ApplicationSystemTestCase
   end
 
   test "should destroy Announcement" do
-    sign_in users(:adminOne)
+    sign_in users(:sysadminOne)
     visit announcements_url
 
     accept_alert do

@@ -32,18 +32,21 @@
 #  summary_type           :integer          not null
 #  summary_code           :text(4294967295)
 #  summary_compiler_id    :bigint
+#  user_id                :bigint
 #
 # Indexes
 #
 #  index_problems_on_name                   (name)
 #  index_problems_on_specjudge_compiler_id  (specjudge_compiler_id)
 #  index_problems_on_summary_compiler_id    (summary_compiler_id)
+#  index_problems_on_user_id                (user_id)
 #  index_problems_on_visible_state          (visible_state)
 #
 # Foreign Keys
 #
 #  fk_rails_...  (specjudge_compiler_id => compilers.id)
 #  fk_rails_...  (summary_compiler_id => compilers.id)
+#  fk_rails_...  (user_id => users.id)
 #
 
 class Problem < ApplicationRecord
@@ -78,6 +81,7 @@ class Problem < ApplicationRecord
 
   belongs_to :specjudge_compiler, class_name: 'Compiler', optional: true
   belongs_to :summary_compiler, class_name: 'Compiler', optional: true
+  belongs_to :user, class_name: 'UserBase', optional: true, foreign_key: :user_id
 
   validates_length_of :sjcode, maximum: 5000000
   validates_length_of :interlib, maximum: 5000000

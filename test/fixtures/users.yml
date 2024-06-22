@@ -27,6 +27,7 @@
 #  last_compiler_id       :bigint
 #  type                   :string(255)      default("User"), not null
 #  contest_id             :bigint
+#  role                   :string(255)
 #
 # Indexes
 #
@@ -52,6 +53,18 @@ userOne:
   school: userOneSchool
   gradyear: 123
   admin: false
+  role: 'normaluser'
+
+sysadminOne:
+  email: sysadminOne@example.org
+  encrypted_password: <%= User.new.send(:password_digest, 'sysadminOne') %>
+  username: sysadminOne
+  name: sysadminOneName
+  nickname: sysadminOneNck
+  school: sysadminOneSchool
+  gradyear: 123
+  admin: true
+  role: 'sysadmin'
 
 adminOne:
   email: adminOne@example.org
@@ -61,4 +74,39 @@ adminOne:
   nickname: adminOneNck
   school: adminOneSchool
   gradyear: 123
-  admin: true
+  admin: false
+  role: 'admin'
+
+normal_userOne:
+  email: normal_userOne@example.org
+  encrypted_password: <%= User.new.send(:password_digest, 'normal_userOne') %>
+  username: normal_userOne
+  name: normal_userOneName
+  nickname: normal_userOneNck
+  school: normal_userOneSchool
+  gradyear: 123
+  admin: false
+  role: 'normal_user'
+
+problem_setterOne:
+  email: problem_setterOne@example.org
+  encrypted_password: <%= User.new.send(:password_digest, 'problem_setterOne') %>
+  username: problem_setterOne
+  name: problem_setterOneName
+  nickname: problem_setterOneNck
+  school: problem_setterOneSchool
+  gradyear: 123
+  admin: false
+  role: 'problem_setter'
+  id: 123
+
+guestOne:
+  email: guestOne@example.org
+  encrypted_password: <%= User.new.send(:password_digest, 'guestOne') %>
+  username: guestOne
+  name: guestOneName
+  nickname: guestOneNck
+  school: guestOneSchool
+  gradyear: 123
+  admin: false
+  role: 'guest'

@@ -32,18 +32,21 @@
 #  summary_type           :integer          not null
 #  summary_code           :text(4294967295)
 #  summary_compiler_id    :bigint
+#  user_id                :bigint
 #
 # Indexes
 #
 #  index_problems_on_name                   (name)
 #  index_problems_on_specjudge_compiler_id  (specjudge_compiler_id)
 #  index_problems_on_summary_compiler_id    (summary_compiler_id)
+#  index_problems_on_user_id                (user_id)
 #  index_problems_on_visible_state          (visible_state)
 #
 # Foreign Keys
 #
 #  fk_rails_...  (specjudge_compiler_id => compilers.id)
 #  fk_rails_...  (summary_compiler_id => compilers.id)
+#  fk_rails_...  (user_id => users.id)
 #
 
 one:
@@ -57,6 +60,7 @@ one:
   specjudge_type: none
   interlib_type: none
   visible_state: public
+  summary_type: 'none'
 
 invisible:
   name: ProblemInvisible
@@ -69,3 +73,32 @@ invisible:
   specjudge_type: none
   interlib_type: none
   visible_state: invisible
+  summary_type: 'none'
+
+problemSetterOne:
+  name: ProblemSetterOne
+  description: String1-1
+  input: String1-2
+  output: String1-3
+  hint: String1-4
+  source: String1-5
+  verdict_ignore_td_list: ""
+  specjudge_type: none
+  interlib_type: none
+  visible_state: public
+  summary_type: 'none'
+  user_id: 123
+
+problemSetterInvisible:
+  name: ProblemSetterInvible
+  description: String1-1
+  input: String1-2
+  output: String1-3
+  hint: String1-4
+  source: String1-5
+  verdict_ignore_td_list: ""
+  specjudge_type: none
+  interlib_type: none
+  visible_state: invisible
+  summary_type: 'none'
+  user_id: 123

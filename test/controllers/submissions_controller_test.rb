@@ -34,7 +34,7 @@ class SubmissionsControllerTest < ActionDispatch::IntegrationTest
     end
     sign_out :user
 
-    sign_in users(:adminOne)
+    sign_in users(:sysadminOne)
     get submission_url(@submission_invisible)
     assert_response :success
   end
@@ -58,13 +58,13 @@ class SubmissionsControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "should get edit" do
-    sign_in users(:adminOne)
+    sign_in users(:sysadminOne)
     get edit_submission_url(@submission)
     assert_response :success
   end
 
   test "should update submission" do
-    sign_in users(:adminOne)
+    sign_in users(:sysadminOne)
     code = "anothercode"
     patch submission_url(@submission), params: {submission: {
       compiler_id: compilers(:c99).id,
@@ -78,7 +78,7 @@ class SubmissionsControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "should destroy submission" do
-    sign_in users(:adminOne)
+    sign_in users(:sysadminOne)
     assert_difference("Submission.count", -1) do
       delete submission_url(@submission)
     end

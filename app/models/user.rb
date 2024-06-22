@@ -27,6 +27,7 @@
 #  last_compiler_id       :bigint
 #  type                   :string(255)      default("User"), not null
 #  contest_id             :bigint
+#  role                   :string(255)
 #
 # Indexes
 #
@@ -47,7 +48,9 @@ require 'file_size_validator'
 
 class UserBase < ApplicationRecord
   self.table_name = "users"
+  ROLES = %i[sysadmin admin problem_setter normal_user guest]
 
+  has_many :problems, dependent: :destroy, foreign_key: :user_id
   has_many :submissions, dependent: :destroy, foreign_key: :user_id
   has_many :posts, dependent: :destroy, foreign_key: :user_id
   has_many :comments, dependent: :destroy, foreign_key: :user_id

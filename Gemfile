@@ -104,3 +104,8 @@ group :test do
   gem 'selenium-webdriver'
   gem 'puma'
 end
+
+
+gem 'cancancan'
+
+gem 'pry-remote'
