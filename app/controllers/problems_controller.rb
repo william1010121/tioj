@@ -1,6 +1,9 @@
 class ProblemsController < ApplicationController
   before_action :authenticate_user_and_running_if_single_contest!, only: [:show]
+
+  #for cancancan need to remove this
   before_action :authenticate_admin!, only: [:new, :create, :edit, :update, :destroy]
+
   before_action :set_problem, only: [:show, :edit, :update, :destroy, :ranklist, :ranklist_old, :rejudge]
   before_action :set_testdata, only: [:show]
   before_action :set_compiler, only: [:new, :edit]

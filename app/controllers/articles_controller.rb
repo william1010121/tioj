@@ -1,5 +1,6 @@
 class ArticlesController < ApplicationController
   before_action :authenticate_admin!, except: [:index, :show]
+  # show be replaced by cancancan
   before_action :set_article, only: [:show, :edit, :update, :destroy]
 
   def index

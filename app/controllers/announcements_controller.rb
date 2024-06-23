@@ -4,6 +4,9 @@ class AnnouncementsController < InheritedResources::Base
   before_action :redirect_contest, only: [:edit]
   before_action :set_paths, only: [:create, :update, :destroy]
   before_action :authenticate_admin!
+  #should be replace by cancancna
+
+
   layout :set_contest_layout, only: [:index, :edit]
 
   def index

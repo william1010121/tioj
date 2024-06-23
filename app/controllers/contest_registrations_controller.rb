@@ -1,6 +1,7 @@
 class ContestRegistrationsController < InheritedResources::Base
   actions :index, :create, :update, :destroy
   before_action :authenticate_admin!
+  #show be replaced by cancancan
   before_action :set_registration, only: [:update, :destroy]
   before_action :set_contest_user, only: [:edit_contest_user, :update_contest_user]
   layout :set_contest_layout
@@ -134,7 +135,7 @@ class ContestRegistrationsController < InheritedResources::Base
         FileUtils.remove_dir(@avatar_dir) if @avatar_dir
       end
       return true
-    end    
+    end
   end
 
   def batch_create
